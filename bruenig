@@ -17,8 +17,8 @@ usage() {
 
 #Get the json file from aur and put into tmpfile
 downloadfromaur() {
-  wget -q "$url" -O- | sed 's/","/"\n"/g' >"$tmpfile"
-  [[ $? -ne 0 ]] && err "Downloading failed"
+  wget -q "$url" -O- | sed -e 's/","/"\n"/g' -e 's/\\//g' > "$tmpfile"
+  [[ $? -ne 0 ]] && err "Downloading failed."
 }
 
 case "$1" in
@@ -28,7 +28,7 @@ case "$1" in
   *)     err "Option \`$1' is not valid." ;;
 esac
  
-# Searching
+# Search (-Ss) handling
 if [[ $option = search ]]; then
   downloadfromaur
 
@@ -36,9 +36,9 @@ if [[ $option = search ]]; then
   IFS=$'\n'
   name=( $(grep -F '"Name":"' "$tmpfile" | cut -d '"' -f 4) )
   version=( $(grep -F '"Version":"' "$tmpfile" | cut -d '"' -f 4) )
-  description=( $(grep -F '"Description":"' "$tmpfile" | sed -e 's/^"Description":"//' -e 's/"$/ /' -e 's/\\//g') )
+  description=( $(grep -F '"Description":"' "$tmpfile" | sed -e 's/^"Description":"//' -e 's/"$/ /') )
 
-  # Echo out the formatted package information
+  # Echo out the -Ss formatted package information
   total="${#name[@]}"
   for ((i=0 ; i<$total ; i++)); do
     echo "aur/${name[$i]} ${version[$i]}"
@@ -46,3 +46,60 @@ if [[ $option = search ]]; then
   done
   exit 0
 fi
+
+# Info (-Si) handling
+if [[ $option = info ]]; then
+  downloadfromaur
+  
+  # Echo out the -Si formatted package information
+  # Retrieve each element in order and echo them immediately
+  echo "Repository      : aur"
+
+  name="$(grep -F '"Name":' "$tmpfile" | cut -d '"' -f 4)"
+  echo "Name            : $name"
+
+  version="$(grep -F '"Version":' "$tmpfile" | cut -d '"' -f 4)"
+  echo "Version         : $version"
+
+  url="$(grep -F '"URL":' "$tmpfile" | cut -d '"' -f 4)"
+  echo "URL             : $url"
+
+  aurpage="http://aur.archlinux.org/packages.php?ID=$(grep -F '"ID":' "$tmpfile" | cut -d '"' -f 6)"
+  echo "AUR Page        : $aurpage"
+
+  categories=(blank blank daemons devel editors emulators games gnome i18n kde lib
+              modules multimedia network office science system x11 xfce kernels)
+  id="$(grep -F '"CategoryID":' "$tmpfile" | cut -d '"' -f 4)"
+  category="${categories[$id]}"
+  echo "Category        : $category"
+  
+  license="$(grep -F '"License":' "$tmpfile" | cut -d '"' -f 4)"
+  echo "Licenses        : $license"
+
+  votes="$(grep -F '"NumVotes":' "$tmpfile" | cut -d '"' -f 4)"
+  echo "Number of Votes : $votes"
+  
+  answers=(No Yes)
+  num="$(grep -F '"OutOfDate":' "$tmpfile" | cut -d '"' -f 4)"
+  outofdate="${answers[$num]}"
+  echo "Out of Date     : $outofdate"
+
+  description="$(grep -F '"Description":"' "$tmpfile" | sed -e 's/^"Description":"//' -e 's/"$/ /')"
+  echo "Description     : $description"
+  echo
+fi
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
