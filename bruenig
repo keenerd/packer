@@ -1,15 +1,43 @@
 #!/bin/bash
-url="http://aur.archlinux.org/rpc.php?type=search&arg=$1"
 tmpfile="/tmp/output"
 
-wget -q "$url" -O- | sed 's/","/"\n"/g' >"$tmpfile"
-IFS=$'\n'
-name=( $(grep -F '"Name":"' "$tmpfile" | cut -d '"' -f 4) )
-version=( $(grep -F '"Version":"' "$tmpfile" | cut -d '"' -f 4) )
-description=( $(grep -F '"Description":"' "$tmpfile" | sed -e 's/^"Description":"//' -e 's/"$/ /' -e 's/\\//g') )
-total="${#name[@]}"
+err() {
+  echo "$1"
+  exit 1
+}
 
-for ((i=0 ; i<$total ; i++)); do
-  echo "aur/${name[$i]} ${version[$i]}"
-  echo "    ${description[$i]}"
-done
+usage() {
+  echo "usage: bruenig [option] package"
+  echo
+  echo "    -Ss - searches aur for package"
+  echo "    -Si - outputs info for package"
+  echo "    -h  - outputs this message"
+  exit
+}
+
+case "$1" in
+  '-Ss') option=search ; url="http://aur.archlinux.org/rpc.php?type=search&arg=$2" ;;
+  '-Si') option=info ; url="http://aur.archlinux.org/rpc.php?type=info&arg=$2" ;;
+  '')    usage ;;
+  *)     err "Option \`$1' is not valid." ;;
+esac
+ 
+# Searching
+if [[ $option = search ]]; then
+  # Get the json file from aur
+  wget -q "$url" -O- | sed 's/","/"\n"/g' >"$tmpfile"
+
+  # Fill up the arrays with package information from dump file
+  IFS=$'\n'
+  name=( $(grep -F '"Name":"' "$tmpfile" | cut -d '"' -f 4) )
+  version=( $(grep -F '"Version":"' "$tmpfile" | cut -d '"' -f 4) )
+  description=( $(grep -F '"Description":"' "$tmpfile" | sed -e 's/^"Description":"//' -e 's/"$/ /' -e 's/\\//g') )
+
+  # Echo out the formatted package information
+  total="${#name[@]}"
+  for ((i=0 ; i<$total ; i++)); do
+    echo "aur/${name[$i]} ${version[$i]}"
+    echo "    ${description[$i]}"
+  done
+  exit 0
+fi
