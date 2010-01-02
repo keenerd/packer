@@ -88,18 +88,3 @@ if [[ $option = info ]]; then
   echo "Description     : $description"
   echo
 fi
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
