@@ -50,6 +50,9 @@ fi
 # Info (-Si) handling
 if [[ $option = info ]]; then
   downloadfromaur
+
+  # Exit if there is no such package
+  grep -Fq ':"No result found"' "$tmpfile" && err "No result found."
   
   # Echo out the -Si formatted package information
   # Retrieve each element in order and echo them immediately
