@@ -1,0 +1,15 @@
+#!/bin/bash
+url="http://aur.archlinux.org/rpc.php?type=search&arg=$1"
+tmpfile="/tmp/output"
+
+wget -q "$url" -O- | sed 's/","/"\n"/g' >"$tmpfile"
+IFS=$'\n'
+name=( $(grep -F '"Name":"' "$tmpfile" | cut -d '"' -f 4) )
+version=( $(grep -F '"Version":"' "$tmpfile" | cut -d '"' -f 4) )
+description=( $(grep -F '"Description":"' "$tmpfile" | sed -e 's/^"Description":"//' -e 's/"$/ /' -e 's/\\//g') )
+total="${#name[@]}"
+
+for ((i=0 ; i<$total ; i++)); do
+  echo "aur/${name[$i]} ${version[$i]}"
+  echo "    ${description[$i]}"
+done
