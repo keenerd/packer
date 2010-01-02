@@ -24,7 +24,7 @@ downloadfromaur() {
 case "$1" in
   '-Ss') option=search ; url="http://aur.archlinux.org/rpc.php?type=search&arg=$2" ;;
   '-Si') option=info ; url="http://aur.archlinux.org/rpc.php?type=info&arg=$2" ;;
-  '')    usage ;;
+  ''|'-h')    usage ;;
   *)     err "Option \`$1' is not valid." ;;
 esac
  
