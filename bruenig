@@ -15,7 +15,7 @@ usage() {
   exit
 }
 
-#Get the json file from aur and put into tmpfile
+# Get the json file from aur and put into tmpfile
 downloadfromaur() {
   wget -q "$url" -O- | sed -e 's/","/"\n"/g' -e 's/\\//g' > "$tmpfile"
   [[ $? -ne 0 ]] && err "Downloading failed."
@@ -30,6 +30,10 @@ esac
  
 # Search (-Ss) handling
 if [[ $option = search ]]; then
+  # Pacman searching 
+  pacman -Ss "$2"
+
+  # Aur searching
   downloadfromaur
 
   # Fill up the arrays with package information from dump file
@@ -49,45 +53,52 @@ fi
 
 # Info (-Si) handling
 if [[ $option = info ]]; then
-  downloadfromaur
+  # Pacman info check
+  pacmanoutput="$(pacman -Si $2 2>&1)"
+  if ! [[ $pacmanoutput = "error: package '$2' was not found" ]]; then
+    echo "$pacmanoutput"
+    exit
+  else # Check to see if it is in the aur
+    downloadfromaur
 
-  # Exit if there is no such package
-  grep -Fq ':"No result found"' "$tmpfile" && err "No result found."
+    # Exit if there is no such package
+    grep -Fq ':"No result found"' "$tmpfile" && err "No result found."
   
-  # Echo out the -Si formatted package information
-  # Retrieve each element in order and echo them immediately
-  echo "Repository      : aur"
+    # Echo out the -Si formatted package information
+    # Retrieve each element in order and echo them immediately
+    echo "Repository      : aur"
 
-  name="$(grep -F '"Name":' "$tmpfile" | cut -d '"' -f 4)"
-  echo "Name            : $name"
+    name="$(grep -F '"Name":' "$tmpfile" | cut -d '"' -f 4)"
+    echo "Name            : $name"
 
-  version="$(grep -F '"Version":' "$tmpfile" | cut -d '"' -f 4)"
-  echo "Version         : $version"
+    version="$(grep -F '"Version":' "$tmpfile" | cut -d '"' -f 4)"
+    echo "Version         : $version"
 
-  url="$(grep -F '"URL":' "$tmpfile" | cut -d '"' -f 4)"
-  echo "URL             : $url"
+    url="$(grep -F '"URL":' "$tmpfile" | cut -d '"' -f 4)"
+    echo "URL             : $url"
 
-  aurpage="http://aur.archlinux.org/packages.php?ID=$(grep -F '"ID":' "$tmpfile" | cut -d '"' -f 6)"
-  echo "AUR Page        : $aurpage"
-
-  categories=(blank blank daemons devel editors emulators games gnome i18n kde lib
+    aurpage="http://aur.archlinux.org/packages.php?ID=$(grep -F '"ID":' "$tmpfile" | cut -d '"' -f 6)"
+    echo "AUR Page        : $aurpage"
+  
+    categories=(blank blank daemons devel editors emulators games gnome i18n kde lib
               modules multimedia network office science system x11 xfce kernels)
-  id="$(grep -F '"CategoryID":' "$tmpfile" | cut -d '"' -f 4)"
-  category="${categories[$id]}"
-  echo "Category        : $category"
+    id="$(grep -F '"CategoryID":' "$tmpfile" | cut -d '"' -f 4)"
+    category="${categories[$id]}"
+    echo "Category        : $category"
   
-  license="$(grep -F '"License":' "$tmpfile" | cut -d '"' -f 4)"
-  echo "Licenses        : $license"
+    license="$(grep -F '"License":' "$tmpfile" | cut -d '"' -f 4)"
+    echo "Licenses        : $license"
 
-  votes="$(grep -F '"NumVotes":' "$tmpfile" | cut -d '"' -f 4)"
-  echo "Number of Votes : $votes"
+    votes="$(grep -F '"NumVotes":' "$tmpfile" | cut -d '"' -f 4)"
+    echo "Number of Votes : $votes"
   
-  answers=(No Yes)
-  num="$(grep -F '"OutOfDate":' "$tmpfile" | cut -d '"' -f 4)"
-  outofdate="${answers[$num]}"
-  echo "Out of Date     : $outofdate"
+    answers=(No Yes)
+    num="$(grep -F '"OutOfDate":' "$tmpfile" | cut -d '"' -f 4)"
+    outofdate="${answers[$num]}"
+    echo "Out of Date     : $outofdate"
 
-  description="$(grep -F '"Description":"' "$tmpfile" | sed -e 's/^"Description":"//' -e 's/"$/ /')"
-  echo "Description     : $description"
-  echo
+    description="$(grep -F '"Description":"' "$tmpfile" | sed -e 's/^"Description":"//' -e 's/"$/ /')"
+    echo "Description     : $description"
+    echo
+  fi
 fi
