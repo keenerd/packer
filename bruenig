@@ -16,11 +16,12 @@ usage() {
 }
 
 # Get the json file from aur and put into tmpfile
-downloadfromaur() {
+getjson() {
   wget -q "$1" -O- | sed -e 's/","/"\n"/g' -e 's/\\//g' > "$tmpfile"
   [[ $? -ne 0 ]] && err "Downloading failed."
 }
 
+package="$2"
 case "$1" in
   '-Ss')   option=search ;;
   '-Si')   option=info ;;
@@ -31,10 +32,10 @@ esac
 # Search (-Ss) handling
 if [[ $option = search ]]; then
   # Pacman searching 
-  pacman -Ss "$2"
+  pacman -Ss "$package"
 
   # Aur searching
-  downloadfromaur "http://aur.archlinux.org/rpc.php?type=search&arg=$2" 
+  getjson "http://aur.archlinux.org/rpc.php?type=search&arg=$package"
 
   # Fill up the arrays with package information from dump file
   IFS=$'\n'
@@ -54,12 +55,12 @@ fi
 # Info (-Si) handling
 if [[ $option = info ]]; then
   # Pacman info check
-  pacmanoutput="$(pacman -Si $2 2>&1)"
-  if ! [[ $pacmanoutput = "error: package '$2' was not found" ]]; then
+  pacmanoutput="$(pacman -Si "$package" 2>&1)"
+  if ! [[ $pacmanoutput = "error: package '$package' was not found" ]]; then
     echo -e "$pacmanoutput\n"
     exit
   else # Check to see if it is in the aur
-    downloadfromaur "http://aur.archlinux.org/rpc.php?type=info&arg=$2" 
+    getjson "http://aur.archlinux.org/rpc.php?type=info&arg=$package" 
 
     # Exit if there is no such package
     grep -Fq ':"No result found"' "$tmpfile" && err "No result found."
