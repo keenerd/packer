@@ -15,6 +15,12 @@ usage() {
   exit
 }
 
+#Get the json file from aur and put into tmpfile
+downloadfromaur() {
+  wget -q "$url" -O- | sed 's/","/"\n"/g' >"$tmpfile"
+  [[ $? -ne 0 ]] && err "Downloading failed"
+}
+
 case "$1" in
   '-Ss') option=search ; url="http://aur.archlinux.org/rpc.php?type=search&arg=$2" ;;
   '-Si') option=info ; url="http://aur.archlinux.org/rpc.php?type=info&arg=$2" ;;
@@ -24,8 +30,7 @@ esac
  
 # Searching
 if [[ $option = search ]]; then
-  # Get the json file from aur
-  wget -q "$url" -O- | sed 's/","/"\n"/g' >"$tmpfile"
+  downloadfromaur
 
   # Fill up the arrays with package information from dump file
   IFS=$'\n'
