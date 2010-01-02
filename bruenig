@@ -9,7 +9,7 @@ err() {
 usage() {
   echo "usage: bruenig [option] package"
   echo
-  echo "    -Ss - searches aur for package"
+  echo "    -Ss - searches for package"
   echo "    -Si - outputs info for package"
   echo "    -h  - outputs this message"
   exit
@@ -17,15 +17,15 @@ usage() {
 
 # Get the json file from aur and put into tmpfile
 downloadfromaur() {
-  wget -q "$url" -O- | sed -e 's/","/"\n"/g' -e 's/\\//g' > "$tmpfile"
+  wget -q "$1" -O- | sed -e 's/","/"\n"/g' -e 's/\\//g' > "$tmpfile"
   [[ $? -ne 0 ]] && err "Downloading failed."
 }
 
 case "$1" in
-  '-Ss') option=search ; url="http://aur.archlinux.org/rpc.php?type=search&arg=$2" ;;
-  '-Si') option=info ; url="http://aur.archlinux.org/rpc.php?type=info&arg=$2" ;;
-  ''|'-h')    usage ;;
-  *)     err "Option \`$1' is not valid." ;;
+  '-Ss')   option=search ;;
+  '-Si')   option=info ;;
+  ''|'-h') usage ;;
+  *)       err "Option \`$1' is not valid." ;;
 esac
  
 # Search (-Ss) handling
@@ -34,7 +34,7 @@ if [[ $option = search ]]; then
   pacman -Ss "$2"
 
   # Aur searching
-  downloadfromaur
+  downloadfromaur "http://aur.archlinux.org/rpc.php?type=search&arg=$2" 
 
   # Fill up the arrays with package information from dump file
   IFS=$'\n'
@@ -56,10 +56,10 @@ if [[ $option = info ]]; then
   # Pacman info check
   pacmanoutput="$(pacman -Si $2 2>&1)"
   if ! [[ $pacmanoutput = "error: package '$2' was not found" ]]; then
-    echo "$pacmanoutput"
+    echo -e "$pacmanoutput\n"
     exit
   else # Check to see if it is in the aur
-    downloadfromaur
+    downloadfromaur "http://aur.archlinux.org/rpc.php?type=info&arg=$2" 
 
     # Exit if there is no such package
     grep -Fq ':"No result found"' "$tmpfile" && err "No result found."
