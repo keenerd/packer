@@ -29,15 +29,6 @@ existsinaur() {
   return 0
 }
   
-# Scrapes aur package page for dependencies of $1 (uses existsinaur function from above)
-findaurdeps() {
-  wget -q "http://aur.archlinux.org/packages/$1/$1/PKGBUILD" -O "$tmpfile"
-  [[ $? -ne 0 ]] && err "Package \'$1' does not exist"
-  . "$tmpfile"
-  IFS=$'\n'
-  dependencies=( $(echo -e "${depends[*]%%>=*}\n${makedepends[*]%%>=*}" | sort -u) )
-}
-
 # Tests whether $1 exists in pacman
 existsinpacman() {
   pacman -Si "$1" &>/dev/null
@@ -46,6 +37,73 @@ existsinpacman() {
 # Tests whethere $1 exists locally (i.e. is installed)
 existsinlocal() {
   pacman -Qq "$1" &>/dev/null
+}
+
+# Scrapes aur package page for dependencies of $1 (uses existsinaur function from above)
+findaurdeps() {
+  wget -q "http://aur.archlinux.org/packages/$1/$1/PKGBUILD" -O "$tmpfile"
+  [[ $? -ne 0 ]] && err "Package \`$1' does not exist."
+  . "$tmpfile"
+  IFS=$'\n'
+  dependencies=( $(echo -e "${depends[*]%%>=*}\n${makedepends[*]%%>=*}" | sort -u) )
+}
+
+# Installs packages from aur ($1 is package, $2 is 'dependency' or 'explicit')
+aurinstall() {
+  dir="/tmp/$1-$USER"
+  
+  # Prepare the installation directory
+  if [[ -f $dir/$1/PKGBUILD ]]; then
+    cd "$dir/$1"
+  else
+    [[ -d $dir ]] && rm -rf $dir
+    mkdir "$dir"
+    cd "$dir"
+    wget "http://aur.archlinux.org/packages/$1/$1.tar.gz"
+    tar xf "$1.tar.gz"
+    cd "$1"
+  fi
+
+  # Allow user to edit PKGBUILD
+  if [[ -f PKGBUILD ]]; then
+    echo -n "Edit $1 PKGBUILD with \$EDITOR? [Y/n] "
+    read -n 1 answer
+    echo
+    case "$answer" in
+      'Y'|'y')
+        [[ $EDITOR ]] || EDITOR=vi
+        $EDITOR PKGBUILD
+        ;;
+    esac
+  else
+    err "No PKGBUILD found in directory."
+  fi
+
+  # Allow user to edit .install
+  unset install
+  . PKGBUILD
+  if [[ $install ]]; then
+    echo -n "Edit $install with \$EDITOR? [Y/n] "
+    read -n 1 answer
+    echo
+    case "$answer" in
+      'Y'|'y')
+        [[ $EDITOR ]] || EDITOR=vi
+        $EDITOR "$install"
+        ;;
+    esac 
+  fi
+  
+  # Installation
+  makepkg -df
+  [[ $? -eq 0 ]] || err "The build failed."
+  if [[ $UID -eq 0 ]]; then
+    [[ $2 = dependency ]] && pacman --asdeps -U *.pkg.tar.gz
+    [[ $2 = explicit ]] && pacman -U *.pkg.tar.gz
+  else
+    [[ $2 = dependency ]] && sudo pacman --asdeps -U *.pkg.tar.gz
+    [[ $2 = explicit ]] && sudo pacman -U *.pkg.tar.gz
+  fi
 }
 
 
@@ -116,6 +174,42 @@ if [[ $option = install ]]; then
       done
     done
   fi
+
+  # Prompt for install or not
+  echo
+  if [[ $aurdeps ]]; then
+    echo "Aur Targets    : ${aurdeps[@]} $package"
+  else 
+    echo "Aur Targets    : $package"
+  fi
+  [[ $pacmandeps ]] && echo "Pacman Targets : ${pacmandeps[@]}"
+  echo
+  echo -n "Proceed with installation? [Y/n] "
+  read -n 1 answer
+  echo
+  case "$answer" in
+    'Y'|'y') ;;
+    *) exit ;;
+  esac
+
+  # Install pacman dependencies
+  if [[ -n $pacmandeps ]]; then
+    if [[ $UID = 0 ]]; then
+      pacman --asdeps --noconfirm -S "${pacmandeps[@]}"
+    else
+      sudo pacman --asdeps --noconfirm -S "${pacmandeps[@]}"
+    fi
+  fi
+  
+  # Install aur dependencies
+  if [[ -n $aurdeps ]]; then
+    for dep in "${aurdeps[@]}"; do
+      aurinstall "$dep" "dependency"
+    done
+  fi
+
+  # Install the aur package finally
+  aurinstall "$package" "explicit"
 fi
 
 
