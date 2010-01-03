@@ -30,18 +30,12 @@ existsinaur() {
 }
   
 # Scrapes aur package page for dependencies of $1 (uses existsinaur function from above)
-#findaurdeps() {
-#  existsinaur "$1" || err "Package \`$1' does not exist."
-#  aurpage="http://aur.archlinux.org/packages.php?ID=$(grep -F '"ID":' "$tmpfile" | cut -d '"' -f 6)"
-#  IFS=$'\n'
-#  dependencies=( $(wget -q "$aurpage" -O- | grep -F Dependencies | tr '=' '\n' | grep -F '</a>' | cut -d '>' -f 2 | cut -d '<' -f 1) )
-#}
-
 findaurdeps() {
   wget -q "http://aur.archlinux.org/packages/$1/$1/PKGBUILD" -O "$tmpfile"
   [[ $? -ne 0 ]] && err "Package \'$1' does not exist"
   . "$tmpfile"
-  dependencies=( "${depends[@]%%>=*}" "${makedepends[@]%%>=*}" )
+  IFS=$'\n'
+  dependencies=( $(echo -e "${depends[*]%%>=*}\n${makedepends[*]%%>=*}" | sort -u) )
 }
 
 # Tests whether $1 exists in pacman
@@ -97,7 +91,7 @@ if [[ $option = install ]]; then
     fi
   done
 
-  # Aur dependencies can be recursive, so recurse through them
+  # Aur dependencies can be complex, so find all of them
   if [[ -n $aurdeps ]]; then
     checkdeps=( "${aurdeps[@]}" )
     while [[ -n $checkdeps ]]; do
@@ -122,9 +116,6 @@ if [[ $option = install ]]; then
       done
     done
   fi
-  echo "${pacmandeps[@]}"
-  echo "${aurdeps[@]}"
-
 fi
 
 
