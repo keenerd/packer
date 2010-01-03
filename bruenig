@@ -9,6 +9,7 @@ err() {
 usage() {
   echo "usage: bruenig [option] package"
   echo
+  echo "    -S  - installs package"
   echo "    -Ss - searches for package"
   echo "    -Si - outputs info for package"
   echo "    -h  - outputs this message"
@@ -21,14 +22,112 @@ getjson() {
   [[ $? -ne 0 ]] && err "Downloading failed."
 }
 
+# Tests whether $1 exists on the aur (uses getjson function from above)
+existsinaur() {
+  getjson "http://aur.archlinux.org/rpc.php?type=info&arg=$1"
+  grep -Fq ':"No result found"' "$tmpfile" && return 1
+  return 0
+}
+  
+# Scrapes aur package page for dependencies of $1 (uses existsinaur function from above)
+#findaurdeps() {
+#  existsinaur "$1" || err "Package \`$1' does not exist."
+#  aurpage="http://aur.archlinux.org/packages.php?ID=$(grep -F '"ID":' "$tmpfile" | cut -d '"' -f 6)"
+#  IFS=$'\n'
+#  dependencies=( $(wget -q "$aurpage" -O- | grep -F Dependencies | tr '=' '\n' | grep -F '</a>' | cut -d '>' -f 2 | cut -d '<' -f 1) )
+#}
+
+findaurdeps() {
+  wget -q "http://aur.archlinux.org/packages/$1/$1/PKGBUILD" -O "$tmpfile"
+  [[ $? -ne 0 ]] && err "Package \'$1' does not exist"
+  . "$tmpfile"
+  dependencies=( "${depends[@]%%>=*}" "${makedepends[@]%%>=*}" )
+}
+
+# Tests whether $1 exists in pacman
+existsinpacman() {
+  pacman -Si "$1" &>/dev/null
+}
+
+# Tests whethere $1 exists locally (i.e. is installed)
+existsinlocal() {
+  pacman -Qq "$1" &>/dev/null
+}
+
+
+#Argument parsing
 package="$2"
 case "$1" in
+  '-S')    option=install ;;
   '-Ss')   option=search ;;
   '-Si')   option=info ;;
   ''|'-h') usage ;;
   *)       err "Option \`$1' is not valid." ;;
 esac
  
+# Install (-S) handling
+if [[ $option = install ]]; then
+  
+  # Determine whether package is in pacman repos
+  if existsinpacman "$package"; then
+    if [[ $UID = 0 ]]; then
+      pacman -S "$package"
+    else
+      sudo pacman -S "$package"
+    fi
+    exit
+  fi
+    
+  # Scrape the aurpage for dependencies
+  findaurdeps "$package"
+  echo "Resolving dependencies..."
+
+  # If dependencies are not installed, figure out where they can be found
+  pacmandeps=()
+  aurdeps=()
+  for dep in "${dependencies[@]}"; do
+    if ! existsinlocal "$dep"; then
+      if existsinpacman "$dep"; then
+        pacmandeps+=("$dep")
+      elif existsinaur "$dep"; then
+        aurdeps+=("$dep")
+      else
+        err "Dependency \`$dep' does not exist."
+      fi
+    fi
+  done
+
+  # Aur dependencies can be recursive, so recurse through them
+  if [[ -n $aurdeps ]]; then
+    checkdeps=( "${aurdeps[@]}" )
+    while [[ -n $checkdeps ]]; do
+      tmpdeps=( "${checkdeps[@]}" )
+      checkdeps=()
+      for aurdep in "${tmpdeps[@]}"; do
+        findaurdeps "$aurdep"
+        for dep in "${dependencies[@]}"; do
+          if ! [[ "$package ${pacmandeps[@]} ${aurdeps[@]}" =~ "$dep" ]]; then
+            if ! existsinlocal "$dep"; then
+              if existsinpacman "$dep"; then
+                pacmandeps+=("$dep")
+              elif existsinaur "$dep"; then
+                aurdeps+=("$dep")
+                checkdeps+=("$dep")
+              else
+                err "Dependency \`$dep' does not exist."
+              fi
+            fi
+          fi
+        done
+      done
+    done
+  fi
+  echo "${pacmandeps[@]}"
+  echo "${aurdeps[@]}"
+
+fi
+
+
 # Search (-Ss) handling
 if [[ $option = search ]]; then
   # Pacman searching 
@@ -60,46 +159,48 @@ if [[ $option = info ]]; then
     echo -e "$pacmanoutput\n"
     exit
   else # Check to see if it is in the aur
-    getjson "http://aur.archlinux.org/rpc.php?type=info&arg=$package" 
-
-    # Exit if there is no such package
-    grep -Fq ':"No result found"' "$tmpfile" && err "No result found."
+    wget -q "http://aur.archlinux.org/packages/$package/$package/PKGBUILD" -O "$tmpfile"
+    [[ $? -eq 0 ]] || err "No result found."
+    . "$tmpfile"
+    
   
     # Echo out the -Si formatted package information
     # Retrieve each element in order and echo them immediately
     echo "Repository      : aur"
-
-    name="$(grep -F '"Name":' "$tmpfile" | cut -d '"' -f 4)"
-    echo "Name            : $name"
-
-    version="$(grep -F '"Version":' "$tmpfile" | cut -d '"' -f 4)"
-    echo "Version         : $version"
-
-    url="$(grep -F '"URL":' "$tmpfile" | cut -d '"' -f 4)"
+    echo "Name            : $pkgname"
+    echo "Version         : $pkgver-$pkgrel"
     echo "URL             : $url"
+    echo "Licenses        : ${license[*]}"
 
-    aurpage="http://aur.archlinux.org/packages.php?ID=$(grep -F '"ID":' "$tmpfile" | cut -d '"' -f 6)"
-    echo "AUR Page        : $aurpage"
-  
-    categories=(blank blank daemons devel editors emulators games gnome i18n kde lib
-              modules multimedia network office science system x11 xfce kernels)
-    id="$(grep -F '"CategoryID":' "$tmpfile" | cut -d '"' -f 4)"
-    category="${categories[$id]}"
-    echo "Category        : $category"
-  
-    license="$(grep -F '"License":' "$tmpfile" | cut -d '"' -f 4)"
-    echo "Licenses        : $license"
+    [[ -z "${groups}" ]] && groups="None"
+    echo "Groups          : ${groups[*]}"
 
-    votes="$(grep -F '"NumVotes":' "$tmpfile" | cut -d '"' -f 4)"
-    echo "Number of Votes : $votes"
-  
-    answers=(No Yes)
-    num="$(grep -F '"OutOfDate":' "$tmpfile" | cut -d '"' -f 4)"
-    outofdate="${answers[$num]}"
-    echo "Out of Date     : $outofdate"
+    [[ -z "${provides}" ]] && provides="None"
+    echo "Provides        : ${provides[*]}"
 
-    description="$(grep -F '"Description":"' "$tmpfile" | sed -e 's/^"Description":"//' -e 's/"$/ /')"
-    echo "Description     : $description"
+    echo "Depends On      : ${depends[*]}"
+
+    echo -n "Optional Deps   : "
+    len="${#optdepends[@]}"
+    if [[ $len -eq 0 ]]; then
+      echo "None"
+    else
+      for ((i=0 ; i<$len ; i++)); do
+        if [[ $i = 0 ]]; then
+          echo "${optdepends[$i]}"
+        else
+          echo "                : ${optdepends[$i]}" 
+        fi
+      done
+    fi
+
+    [[ -z "${conflicts}" ]] && conflicts="None"
+    echo "Conflicts With  : ${conflicts[*]}"
+    
+    [[ -z "${replaces}" ]] && replaces="None"
+    echo "Replaces        : ${replaces[*]}"
+    echo "Architecture    : ${arch[*]}"
+    echo "Description     : $pkgdesc"
     echo
   fi
 fi
