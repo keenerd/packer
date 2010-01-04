@@ -263,7 +263,7 @@ if [[ $option = update ]]; then
     fi
   done
 
-  echo ":: Starting full system upgrade..."
+  echo ":: Starting full aur upgrade..."
   if [[ $newpackages ]]; then
     echo "Resolving dependencies..."
     for package in "${newpackages[@]}"; do
