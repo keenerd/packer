@@ -1,5 +1,5 @@
 #!/bin/bash
-tmpfile="/tmp/output"
+tmpfile="$(mktemp)"
 
 err() {
   echo "$1"
@@ -40,13 +40,58 @@ existsinlocal() {
   pacman -Qq "$1" &>/dev/null
 }
 
-# Scrapes aur package page for dependencies of $1 (uses existsinaur function from above)
-findaurdeps() {
+scrapeaurdeps() {
   wget -q "http://aur.archlinux.org/packages/$1/$1/PKGBUILD" -O "$tmpfile"
   [[ $? -ne 0 ]] && err "Package \`$1' does not exist."
   . "$tmpfile"
   IFS=$'\n'
   dependencies=( $(echo -e "${depends[*]}\n${makedepends[*]}" | sed -e 's/=.*//' -e 's/>.*//' | sort -u) )
+}
+ 
+# Scrapes aur package page for dependencies of $1 (uses existsinaur function from above)
+# Sets pacmandeps and aurdeps array, which can be accessed globally after function runs
+finddeps() {
+  scrapeaurdeps "$1" 
+  # loop through dependencies, if not installed, determine if pacman or aur deps
+  pacmandeps=()
+  aurdeps=()
+  for dep in "${dependencies[@]}"; do
+    if ! existsinlocal "$dep"; then
+      if existsinpacman "$dep"; then
+        pacmandeps+=("$dep")
+      elif existsinaur "$dep"; then
+        aurdeps+=("$dep")
+      else
+        err "Dependency \`$dep' does not exist."
+      fi
+    fi
+  done
+
+  # Aur dependencies can be complex, so find all of them
+  if [[ -n $aurdeps ]]; then
+    checkdeps=( "${aurdeps[@]}" )
+    while [[ -n $checkdeps ]]; do
+      tmpdeps=( "${checkdeps[@]}" )
+      checkdeps=()
+      for aurdep in "${tmpdeps[@]}"; do
+        scrapeaurdeps "$aurdep"
+        for dep in "${dependencies[@]}"; do
+          if ! [[ "$package ${pacmandeps[@]} ${aurdeps[@]}" =~ "$dep" ]]; then
+            if ! existsinlocal "$dep"; then
+              if existsinpacman "$dep"; then
+                pacmandeps+=("$dep")
+              elif existsinaur "$dep"; then
+                aurdeps+=("$dep")
+                checkdeps+=("$dep")
+              else
+                err "Dependency \`$dep' does not exist."
+              fi
+            fi
+          fi
+        done
+      done
+    done
+  fi
 }
 
 # Checks if package is newer on aur ($1 is package name, $2 is local version)
@@ -67,7 +112,7 @@ aurversionisnewer() {
 
 # Installs packages from aur ($1 is package, $2 is 'dependency' or 'explicit')
 aurinstall() {
-  dir="/tmp/$1-$USER"
+  dir="/tmp/$1-$UID"
   
   # Prepare the installation directory
   if [[ -f $dir/$1/PKGBUILD ]]; then
@@ -111,8 +156,13 @@ aurinstall() {
     esac 
   fi
   
-  # Installation
-  makepkg -f
+  # Installation (makepkg and pacman)
+  if [[ $UID -eq 0 ]]; then
+    makepkg --asroot -f
+  else
+    makepkg -f
+  fi
+
   [[ $? -eq 0 ]] || err "The build failed."
   if [[ $UID -eq 0 ]]; then
     [[ $2 = dependency ]] && pacman --asdeps -U *.pkg.tar.gz
@@ -149,49 +199,8 @@ if [[ $option = install ]]; then
   fi
     
   # Scrape the aurpage for dependencies
-  findaurdeps "$package"
   echo "Resolving dependencies..."
-
-  # If dependencies are not installed, figure out where they can be found
-  pacmandeps=()
-  aurdeps=()
-  for dep in "${dependencies[@]}"; do
-    if ! existsinlocal "$dep"; then
-      if existsinpacman "$dep"; then
-        pacmandeps+=("$dep")
-      elif existsinaur "$dep"; then
-        aurdeps+=("$dep")
-      else
-        err "Dependency \`$dep' does not exist."
-      fi
-    fi
-  done
-
-  # Aur dependencies can be complex, so find all of them
-  if [[ -n $aurdeps ]]; then
-    checkdeps=( "${aurdeps[@]}" )
-    while [[ -n $checkdeps ]]; do
-      tmpdeps=( "${checkdeps[@]}" )
-      checkdeps=()
-      for aurdep in "${tmpdeps[@]}"; do
-        findaurdeps "$aurdep"
-        for dep in "${dependencies[@]}"; do
-          if ! [[ "$package ${pacmandeps[@]} ${aurdeps[@]}" =~ "$dep" ]]; then
-            if ! existsinlocal "$dep"; then
-              if existsinpacman "$dep"; then
-                pacmandeps+=("$dep")
-              elif existsinaur "$dep"; then
-                aurdeps+=("$dep")
-                checkdeps+=("$dep")
-              else
-                err "Dependency \`$dep' does not exist."
-              fi
-            fi
-          fi
-        done
-      done
-    done
-  fi
+  finddeps "$package"
 
   # Prompt for install or not
   echo
