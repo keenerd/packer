@@ -46,7 +46,7 @@ findaurdeps() {
   [[ $? -ne 0 ]] && err "Package \`$1' does not exist."
   . "$tmpfile"
   IFS=$'\n'
-  dependencies=( $(echo -e "${depends[*]%%>=*}\n${makedepends[*]%%>=*}" | sort -u) )
+  dependencies=( $(echo -e "${depends[*]}\n${makedepends[*]}" | sed -e 's/=.*//' -e 's/>.*//' | sort -u) )
 }
 
 # Checks if package is newer on aur ($1 is package name, $2 is local version)
