@@ -62,7 +62,7 @@ finddeps() {
       elif existsinaur "$dep"; then
         aurdeps+=("$dep")
       else
-        err "Dependency \`$dep' does not exist."
+        err "Dependency \`$dep' of \`$package' does not exist."
       fi
     fi
   done
