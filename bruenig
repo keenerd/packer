@@ -132,7 +132,7 @@ aurinstall() {
     read -n 1 answer
     echo
     case "$answer" in
-      'Y'|'y')
+      'Y'|'y'|'')
         [[ $EDITOR ]] || EDITOR=vi
         $EDITOR PKGBUILD
         ;;
@@ -149,7 +149,7 @@ aurinstall() {
     read -n 1 answer
     echo
     case "$answer" in
-      'Y'|'y')
+      'Y'|'y'|'')
         [[ $EDITOR ]] || EDITOR=vi
         $EDITOR "$install"
         ;;
@@ -179,7 +179,7 @@ proceed() {
   echo
   read -r -p "Proceed with installation? [Y/n] "
   case "$REPLY" in
-    'Y'|'y') return 0 ;;
+    'Y'|'y'|'') return 0 ;;
     *)       return 1 ;;
   esac
 }
@@ -225,9 +225,9 @@ if [[ $option = install ]]; then
   # Install pacman dependencies
   if [[ -n $pacmandeps ]]; then
     if [[ $UID = 0 ]]; then
-      pacman --asdeps --noconfirm -S "${pacmandeps[@]}"
+      pacman --asdeps --noconfirm -S "${pacmandeps[@]}" || err "Installation failed."
     else
-      sudo pacman --asdeps --noconfirm -S "${pacmandeps[@]}"
+      sudo pacman --asdeps --noconfirm -S "${pacmandeps[@]}" || err "Installation failed."
     fi
   fi
   
