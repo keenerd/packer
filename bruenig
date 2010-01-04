@@ -1,5 +1,5 @@
 #!/bin/bash
-tmpfile="$(mktemp)"
+tmpfile="/tmp/output-$UID"
 
 err() {
   echo "$1"
@@ -174,6 +174,16 @@ aurinstall() {
 }
 
 
+# proceed with installation prompt
+proceed() {
+  echo
+  read -r -p "Proceed with installation? [Y/n] "
+  case "$REPLY" in
+    'Y'|'y') return 0 ;;
+    *)       return 1 ;;
+  esac
+}
+
 #Argument parsing
 package="$2"
 case "$1" in
@@ -210,15 +220,8 @@ if [[ $option = install ]]; then
     echo "Aur Targets    : $package"
   fi
   [[ $pacmandeps ]] && echo "Pacman Targets : ${pacmandeps[@]}"
-  echo
-  echo -n "Proceed with installation? [Y/n] "
-  read -n 1 answer
-  echo
-  case "$answer" in
-    'Y'|'y') ;;
-    *) exit ;;
-  esac
 
+  proceed || exit
   # Install pacman dependencies
   if [[ -n $pacmandeps ]]; then
     if [[ $UID = 0 ]]; then
@@ -235,7 +238,7 @@ if [[ $option = install ]]; then
     done
   fi
 
-  # Install the aur package finally
+  # Install the aur package
   aurinstall "$package" "explicit"
 fi
 
@@ -250,6 +253,7 @@ if [[ $option = update ]]; then
   fi
 
   # Aur update
+  echo ":: Synchronizing aur databases..."
   IFS=$'\n'
   packages=( $(pacman -Qm) )
   newpackages=()
@@ -259,20 +263,46 @@ if [[ $option = update ]]; then
     fi
   done
 
+  echo ":: Starting full system upgrade..."
   if [[ $newpackages ]]; then
+    echo "Resolving dependencies..."
+    for package in "${newpackages[@]}"; do
+      finddeps "$package"
+      localaurdeps=( "${localaurdeps[@]}" "${aurdeps[@]}")
+      localpacmandeps=( "${localpacmandeps[@]}" "${pacmandeps[@]}")
+    done
+
     echo
-    echo "Aur Targets    : ${newpackages[@]}"
-    echo
-    echo -n "Proceed with installation? [Y/n] "
-    read -n 1 answer
-    echo
-    case "$answer" in
-      'Y'|'y') ;;
-      *) exit ;;
-    esac 
+    if [[ $localaurdeps ]]; then
+      echo "Aur Targets    : ${localaurdeps[@]} ${newpackages[@]}"
+    else 
+      echo "Aur Targets    : ${newpackages[@]}"
+    fi
+    [[ $localpacmandeps ]] && echo "Pacman Targets : ${pacmandeps[@]}"
+
+    proceed || exit
+    # Install Pacman Dependencies
+    if [[ -n $localpacmandeps ]]; then
+      if [[ $UID = 0 ]]; then
+        pacman --asdeps --noconfirm -S "${localpacmandeps[@]}"
+      else
+        sudo pacman --asdeps --noconfirm -S "${localpacmandeps[@]}"
+      fi
+    fi
+
+    # Install aur dependencies
+    if [[ -n $localaurdeps ]]; then
+      for dep in "${localaurdeps[@]}"; do
+        aurinstall "$dep" "dependency"
+      done
+    fi
+
+    # Install updated packages
     for package in "${newpackages[@]}"; do
       aurinstall "$package" explicit
     done
+  else
+    echo " local database is up to date"
   fi
 fi
 
