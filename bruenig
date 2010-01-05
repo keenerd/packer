@@ -29,7 +29,7 @@ existsinaur() {
   grep -Fq ':"No result found"' "$tmpfile" && return 1
   return 0
 }
-  
+
 # Tests whether $1 exists in pacman
 existsinpacman() {
   pacman -Si "$1" &>/dev/null
@@ -47,7 +47,7 @@ scrapeaurdeps() {
   IFS=$'\n'
   dependencies=( $(echo -e "${depends[*]}\n${makedepends[*]}" | sed -e 's/=.*//' -e 's/>.*//' | sort -u) )
 }
- 
+
 # Scrapes aur package page for dependencies of $1 (uses existsinaur function from above)
 # Sets pacmandeps and aurdeps array, which can be accessed globally after function runs
 finddeps() {
@@ -115,7 +115,7 @@ aurversionisnewer() {
 # Installs packages from aur ($1 is package, $2 is dependency or explicit)
 aurinstall() {
   dir="/tmp/$1-$UID"
-  
+
   # Prepare the installation directory
   if [[ -f $dir/$1/PKGBUILD ]]; then
     cd "$dir/$1"
@@ -157,7 +157,7 @@ aurinstall() {
         ;;
     esac 
   fi
-  
+
   # Installation (makepkg and pacman)
   if [[ $UID -eq 0 ]]; then
     makepkg --asroot -f
@@ -195,10 +195,9 @@ case "$1" in
   ''|'-h') usage ;;
   *)       err "Option \`$1' is not valid." ;;
 esac
- 
+
 # Install (-S) handling
 if [[ $option = install ]]; then
-  
   # Determine whether package is in pacman repos
   if existsinpacman "$package"; then
     if [[ $UID = 0 ]]; then
@@ -208,7 +207,7 @@ if [[ $option = install ]]; then
     fi
     exit
   fi
-    
+
   # Scrape the aurpage for dependencies
   echo "Resolving dependencies..."
   finddeps "$package"
@@ -231,7 +230,7 @@ if [[ $option = install ]]; then
       sudo pacman --asdeps --noconfirm -S "${pacmandeps[@]}" || err "Installation failed."
     fi
   fi
-  
+
   # Install aur dependencies
   if [[ -n $aurdeps ]]; then
     for dep in "${aurdeps[@]}"; do
@@ -242,7 +241,6 @@ if [[ $option = install ]]; then
   # Install the aur package
   aurinstall "$package" "explicit"
 fi
-
 
 # Update (-Su) handling
 if [[ $option = update ]]; then
@@ -348,8 +346,7 @@ if [[ $option = info ]]; then
     wget -q "http://aur.archlinux.org/packages/$package/$package/PKGBUILD" -O "$tmpfile"
     [[ $? -eq 0 ]] || err "No result found."
     . "$tmpfile"
-    
-  
+
     # Echo out the -Si formatted package information
     # Retrieve each element in order and echo them immediately
     echo "Repository      : aur"
@@ -382,7 +379,7 @@ if [[ $option = info ]]; then
 
     [[ -z "${conflicts}" ]] && conflicts="None"
     echo "Conflicts With  : ${conflicts[*]}"
-    
+
     [[ -z "${replaces}" ]] && replaces="None"
     echo "Replaces        : ${replaces[*]}"
     echo "Architecture    : ${arch[*]}"
