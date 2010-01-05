@@ -287,7 +287,6 @@ if [[ $option = update ]]; then
   total="${#packages[@]}"
   for ((i=0; i<$total; i++)); do 
     aurbar "$((i+1))" "$total"
-    sleep 0.5
     if aurversionisnewer "${packages[$i]%% *}" "${packages[$i]##* }"; then
       newpackages+=("${package[$i]%% *}")
     fi
