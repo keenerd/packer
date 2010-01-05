@@ -40,6 +40,7 @@ existsinlocal() {
   pacman -Qq "$1" &>/dev/null
 }
 
+# Scrapes the aur deps from PKGBUILDS and puts in globally available dependencies array
 scrapeaurdeps() {
   wget -q "http://aur.archlinux.org/packages/$1/$1/PKGBUILD" -O "$tmpfile"
   [[ $? -ne 0 ]] && err "Package \`$1' does not exist."
@@ -94,6 +95,33 @@ finddeps() {
       done
     done
   fi
+}
+
+# Displays a progress bar ($1 is numerator, $2 is denominator)
+aurbar() {
+  printf "\033[0G"
+  beginline=" aur"
+  beginbar="["
+  endbar="] "
+  perc="$(($1*100/$2))"
+  width="$(stty size)"
+  width="${width##* }"
+
+  charsused="$((${#beginline}+${#1}+${#2}+${#beginbar}+${#endbar}+${#perc}+4))"
+  charsavail="$(($width-$charsused))"
+ 
+  charsbefore="$(($charsavail/3))"
+  barchars="$(($charsavail-$charsbefore))"
+  hashes="$(($barchars*$perc/100))" 
+  dashes="$(($barchars-$hashes))"
+  printf "$beginline %${charsbefore}s$1  $2 ${beginbar}" ""
+  for ((n=1; n<$hashes; n++)); do
+    printf "#"
+  done
+  for ((n=1; n<$dashes; n++)); do
+    printf "-"
+  done
+  printf "${endbar}${perc}%%"
 }
 
 # Checks if package is newer on aur ($1 is package name, $2 is local version)
@@ -245,22 +273,26 @@ fi
 # Update (-Su) handling
 if [[ $option = update ]]; then
   # Pacman update
-  if [[ $UID = 0 ]]; then
-    pacman "$1"
-  else
-    sudo pacman "$1"
-  fi
+  #if [[ $UID = 0 ]]; then
+    #pacman "$1"
+  #else
+    #sudo pacman "$1"
+  #fi
 
   # Aur update
   echo ":: Synchronizing aur database..."
   IFS=$'\n'
   packages=( $(pacman -Qm) )
   newpackages=()
-  for package in "${packages[@]}"; do
-    if aurversionisnewer "${package%% *}" "${package##* }"; then
-      newpackages+=("${package%% *}")
-    fi
+  total="${#packages[@]}"
+  for ((i=0; i<$total; i++)); do 
+    aurbar "$((i+1))" "$total"
+    sleep 0.5
+    #if aurversionisnewer "${packages[$i]%% *}" "${packages[$i]##* }"; then
+      #newpackages+=("${package[$i]%% *}")
+    #fi
   done
+  echo
 
   echo ":: Starting full aur upgrade..."
   if [[ $newpackages ]]; then
