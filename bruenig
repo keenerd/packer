@@ -62,7 +62,9 @@ finddeps() {
       elif existsinaur "$dep"; then
         aurdeps+=("$dep")
       else
-        err "Dependency \`$dep' of \`$package' does not exist."
+        [[ $option = "install" ]] &&  err "Dependency \`$dep' of \`$package' does not exist."
+        echo "Dependency \`$dep of \`$package' does not exist."
+        return 1
       fi
     fi
   done
@@ -110,7 +112,7 @@ aurversionisnewer() {
   fi
 }
 
-# Installs packages from aur ($1 is package, $2 is 'dependency' or 'explicit')
+# Installs packages from aur ($1 is package, $2 is dependency or explicit)
 aurinstall() {
   dir="/tmp/$1-$UID"
   
@@ -253,7 +255,7 @@ if [[ $option = update ]]; then
   fi
 
   # Aur update
-  echo ":: Synchronizing aur databases..."
+  echo ":: Synchronizing aur database..."
   IFS=$'\n'
   packages=( $(pacman -Qm) )
   newpackages=()
@@ -267,9 +269,12 @@ if [[ $option = update ]]; then
   if [[ $newpackages ]]; then
     echo "Resolving dependencies..."
     for package in "${newpackages[@]}"; do
-      finddeps "$package"
-      localaurdeps=( "${localaurdeps[@]}" "${aurdeps[@]}")
-      localpacmandeps=( "${localpacmandeps[@]}" "${pacmandeps[@]}")
+      if finddeps "$package"; then
+        localaurdeps=( "${localaurdeps[@]}" "${aurdeps[@]}")
+        localpacmandeps=( "${localpacmandeps[@]}" "${pacmandeps[@]}")
+      else
+        echo "Not updating \`$package'."
+      fi 
     done
 
     echo
