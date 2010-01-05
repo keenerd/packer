@@ -35,7 +35,7 @@ existsinpacman() {
   pacman -Si "$1" &>/dev/null
 }
 
-# Tests whethere $1 exists locally (i.e. is installed)
+# Tests whether $1 exists locally (i.e. is installed)
 existsinlocal() {
   pacman -Qq "$1" &>/dev/null
 }
@@ -69,7 +69,7 @@ finddeps() {
     fi
   done
 
-  # Aur dependencies can be complex, so find all of them
+  # Aur dependencies can also have aur dependencies, so find all of them
   if [[ -n $aurdeps ]]; then
     checkdeps=( "${aurdeps[@]}" )
     while [[ -n $checkdeps ]]; do
@@ -175,7 +175,6 @@ aurinstall() {
   fi
 }
 
-
 # proceed with installation prompt
 proceed() {
   echo
@@ -268,10 +267,14 @@ if [[ $option = update ]]; then
   echo ":: Starting full aur upgrade..."
   if [[ $newpackages ]]; then
     echo "Resolving dependencies..."
+    localpackages=()
+    localaurdeps=()
+    localpacmandeps=()
     for package in "${newpackages[@]}"; do
       if finddeps "$package"; then
-        localaurdeps=( "${localaurdeps[@]}" "${aurdeps[@]}")
-        localpacmandeps=( "${localpacmandeps[@]}" "${pacmandeps[@]}")
+        localpackages+=("$package")
+        localaurdeps+=("${aurdeps[@]}")
+        localpacmandeps+=("${pacmandeps[@]}")
       else
         echo "Not updating \`$package'."
       fi 
@@ -279,9 +282,9 @@ if [[ $option = update ]]; then
 
     echo
     if [[ $localaurdeps ]]; then
-      echo "Aur Targets    : ${localaurdeps[@]} ${newpackages[@]}"
+      echo "Aur Targets    : ${localaurdeps[@]} ${localpackages[@]}"
     else 
-      echo "Aur Targets    : ${newpackages[@]}"
+      echo "Aur Targets    : ${localpackages[@]}"
     fi
     [[ $localpacmandeps ]] && echo "Pacman Targets : ${pacmandeps[@]}"
 
@@ -303,7 +306,7 @@ if [[ $option = update ]]; then
     fi
 
     # Install updated packages
-    for package in "${newpackages[@]}"; do
+    for package in "${localpackages[@]}"; do
       aurinstall "$package" explicit
     done
   else
