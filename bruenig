@@ -99,22 +99,24 @@ finddeps() {
 
 # Displays a progress bar ($1 is numerator, $2 is denominator)
 aurbar() {
+  # Delete line
   printf "\033[0G"
+  
+  # Get vars for output
   beginline=" aur"
   beginbar="["
   endbar="] "
   perc="$(($1*100/$2))"
   width="$(stty size)"
   width="${width##* }"
-
-  charsused="$((${#beginline}+${#1}+${#2}+${#beginbar}+${#endbar}+${#perc}+4))"
-  charsavail="$(($width-$charsused))"
- 
-  charsbefore="$(($charsavail/3))"
-  barchars="$(($charsavail-$charsbefore))"
+  charsbefore="$((${#beginline}+${#1}+${#2}+${#beginbar}+3))"
+  spaces="$((52-$charsbefore))"
+  barchars="$(($width-52-${#perc}-3))"
   hashes="$(($barchars*$perc/100))" 
   dashes="$(($barchars-$hashes))"
-  printf "$beginline %${charsbefore}s$1  $2 ${beginbar}" ""
+
+  # Print output
+  printf "$beginline %${spaces}s$1  $2 ${beginbar}" ""
   for ((n=1; n<$hashes; n++)); do
     printf "#"
   done
@@ -237,7 +239,7 @@ if [[ $option = install ]]; then
   fi
 
   # Scrape the aurpage for dependencies
-  echo "Resolving dependencies..."
+  echo "resolving dependencies..."
   finddeps "$package"
 
   # Prompt for install or not
@@ -295,7 +297,7 @@ if [[ $option = update ]]; then
 
   echo ":: Starting full aur upgrade..."
   if [[ $newpackages ]]; then
-    echo "Resolving dependencies..."
+    echo "resolving dependencies..."
     localpackages=()
     localaurdeps=()
     localpacmandeps=()
