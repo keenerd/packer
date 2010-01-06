@@ -1,5 +1,10 @@
 #!/bin/bash
 tmpfile="/tmp/output-$UID"
+if type pacman-color &>/dev/null; then
+  outputpacman='pacman-color'
+else
+  outputpacman='pacman'
+fi
 
 err() {
   echo "$1"
@@ -197,11 +202,11 @@ aurinstall() {
 
   [[ $? -eq 0 ]] || err "The build failed."
   if [[ $UID -eq 0 ]]; then
-    [[ $2 = dependency ]] && pacman --asdeps -U *.pkg.tar.gz
-    [[ $2 = explicit ]] && pacman -U *.pkg.tar.gz
+    [[ $2 = dependency ]] && $outputpacman --asdeps -U *.pkg.tar.gz
+    [[ $2 = explicit ]] && $outputpacman -U *.pkg.tar.gz
   else
-    [[ $2 = dependency ]] && sudo pacman --asdeps -U *.pkg.tar.gz
-    [[ $2 = explicit ]] && sudo pacman -U *.pkg.tar.gz
+    [[ $2 = dependency ]] && sudo $outputpacman --asdeps -U *.pkg.tar.gz
+    [[ $2 = explicit ]] && sudo $outputpacman -U *.pkg.tar.gz
   fi
 }
 
@@ -231,9 +236,9 @@ if [[ $option = install ]]; then
   # Determine whether package is in pacman repos
   if existsinpacman "$package"; then
     if [[ $UID = 0 ]]; then
-      pacman -S "$package"
+      $outputpacman -S "$package"
     else
-      sudo pacman -S "$package"
+      sudo $outputpacman -S "$package"
     fi
     exit
   fi
@@ -255,9 +260,9 @@ if [[ $option = install ]]; then
   # Install pacman dependencies
   if [[ -n $pacmandeps ]]; then
     if [[ $UID = 0 ]]; then
-      pacman --asdeps --noconfirm -S "${pacmandeps[@]}" || err "Installation failed."
+      $outputpacman --asdeps --noconfirm -S "${pacmandeps[@]}" || err "Installation failed."
     else
-      sudo pacman --asdeps --noconfirm -S "${pacmandeps[@]}" || err "Installation failed."
+      sudo $outputpacman --asdeps --noconfirm -S "${pacmandeps[@]}" || err "Installation failed."
     fi
   fi
 
@@ -276,9 +281,9 @@ fi
 if [[ $option = update ]]; then
   # Pacman update
   if [[ $UID = 0 ]]; then
-    pacman "$1"
+    $outputpacman "$1"
   else
-    sudo pacman "$1"
+    sudo $outputpacman "$1"
   fi
 
   # Aur update
@@ -323,9 +328,9 @@ if [[ $option = update ]]; then
     # Install Pacman Dependencies
     if [[ -n $localpacmandeps ]]; then
       if [[ $UID = 0 ]]; then
-        pacman --asdeps --noconfirm -S "${localpacmandeps[@]}"
+        $outputpacman --asdeps --noconfirm -S "${localpacmandeps[@]}"
       else
-        sudo pacman --asdeps --noconfirm -S "${localpacmandeps[@]}"
+        sudo $outputpacman --asdeps --noconfirm -S "${localpacmandeps[@]}"
       fi
     fi
 
@@ -348,7 +353,7 @@ fi
 # Search (-Ss) handling
 if [[ $option = search ]]; then
   # Pacman searching 
-  pacman -Ss "$package"
+  $outputpacman -Ss "$package"
 
   # Aur searching
   getjson "http://aur.archlinux.org/rpc.php?type=search&arg=$package"
@@ -371,9 +376,8 @@ fi
 # Info (-Si) handling
 if [[ $option = info ]]; then
   # Pacman info check
-  pacmanoutput="$(pacman -Si "$package" 2>&1)"
-  if ! [[ $pacmanoutput = "error: package '$package' was not found" ]]; then
-    echo -e "$pacmanoutput\n"
+  if existsinpacman "$package"; then
+    $outputpacman -Si "$package"
     exit
   else # Check to see if it is in the aur
     wget -q "http://aur.archlinux.org/packages/$package/$package/PKGBUILD" -O "$tmpfile"
