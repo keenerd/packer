@@ -57,7 +57,7 @@ scrapeaurdeps() {
   dependencies=( $(echo -e "${depends[*]}\n${makedepends[*]}" | sed -e 's/=.*//' -e 's/>.*//' | sort -u) )
 }
 
-# Scrapes aur package page for dependencies of $1 (uses existsinaur function from above)
+# Finds dependencies of package $1
 # Sets pacmandeps and aurdeps array, which can be accessed globally after function runs
 finddeps() {
   scrapeaurdeps "$1" 
