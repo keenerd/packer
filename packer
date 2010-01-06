@@ -2,7 +2,7 @@
 # Copyright Matthew Bruenig <matthewbruenig@gmail.com>
 # Licensed under GPL version 3
 
-tmpfile="/tmp/output-$UID"
+tmpfile="/tmp/packeroutput-$UID"
 if type pacman-color &>/dev/null; then
   outputpacman='pacman-color'
   COLOR1='\e[1;39m'
@@ -159,14 +159,14 @@ aurversionisnewer() {
 
 # Installs packages from aur ($1 is package, $2 is dependency or explicit)
 aurinstall() {
-  dir="/tmp/$1-$UID"
+  dir="/tmp/packer-$UID/$1"
 
   # Prepare the installation directory
   if [[ -f $dir/$1/PKGBUILD ]]; then
     cd "$dir/$1"
   else
     [[ -d $dir ]] && rm -rf $dir
-    mkdir "$dir"
+    mkdir -p "$dir"
     cd "$dir"
     wget "http://aur.archlinux.org/packages/$1/$1.tar.gz"
     tar xf "$1.tar.gz"
