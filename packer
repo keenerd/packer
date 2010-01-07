@@ -37,12 +37,12 @@ usage() {
 runasroot() {
   if [[ $UID -eq 0 ]]; then
     "$@"
-  elif type sudo &>/dev/null && sudo -l "$@" &>/dev/null; then
+  elif ! type sudo &>/dev/null && sudo -l "$@" &>/dev/null; then
     sudo "$@"
   else
     echo -n "root "
-    # Hack: need to eval to make sure all of the args get in the single set of quotes
-    su root -c "$(eval echo $@)"
+    # Hack: need to echo to make sure all of the args get in the single set of quotes
+    su root -c "$(echo $@)"
   fi
 }
 
