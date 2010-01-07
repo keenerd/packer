@@ -22,7 +22,7 @@ err() {
 }
 
 usage() {
-  echo "usage: packer [option] package"
+  echo "usage: packer [option] [package]"
   echo
   echo "    -S       - installs package"
   echo "    -Syu|-Su - updates all packages"
@@ -397,17 +397,32 @@ fi
 # Search (-Ss) handling
 if [[ $option = search ]]; then
   # Pacman searching 
-  $outputpacman -Ss "$packageargs"
+  $outputpacman -Ss "${packageargs[@]}"
 
-  # Aur searching
-  getjson "http://aur.archlinux.org/rpc.php?type=search&arg=$packageargs"
+  # If only one search term, get output a certain quick way
+  if  [[ ${#packageargs[@]} -eq 1 ]]; then
+    # Fill up the arrays with package information from dump file
+    getjson "http://aur.archlinux.org/rpc.php?type=search&arg=$packageargs"
+    IFS=$'\n'
+    name=( $(grep -F '"Name":"' "$tmpfile" | cut -d '"' -f 4) )
+    version=( $(grep -F '"Version":"' "$tmpfile" | cut -d '"' -f 4) )
+    description=( $(grep -F '"Description":"' "$tmpfile" | sed -e 's/^"Description":"//' -e 's/"$/ /') )
+  else
+    wget -q "http://aur.archlinux.org/rpc.php?type=search&arg=$packageargs" -O- | sed -e 's/{/\n{/g' -e 's/\\//g' > "$tmpfile-0"
+    for ((i=1 ; i<${#packageargs[@]} ; i++)); do
+      grep -e "\"Name\":\".*${packageargs[$i]}.*\",\"Version" -e "\"Description\":\".*${packageargs[$i]}.*\",\"LocationID" "${tmpfile}-$((i-1))" > "$tmpfile-$i"
+    done
 
-  # Fill up the arrays with package information from dump file
-  IFS=$'\n'
-  name=( $(grep -F '"Name":"' "$tmpfile" | cut -d '"' -f 4) )
-  version=( $(grep -F '"Version":"' "$tmpfile" | cut -d '"' -f 4) )
-  description=( $(grep -F '"Description":"' "$tmpfile" | sed -e 's/^"Description":"//' -e 's/"$/ /') )
+    # Prepare tmp file and arrays
+    sed -e 's/","/"\n"/g' -i "$tmpfile-$((i-1))"
+    IFS=$'\n'
+    name=( $(grep -F '"Name":"' "$tmpfile-$((i-1))" | cut -d '"' -f 4) )
+    version=( $(grep -F '"Version":"' "$tmpfile-$((i-1))" | cut -d '"' -f 4) )
+    description=( $(grep -F '"Description":"' "$tmpfile-$((i-1))" | sed -e 's/^"Description":"//' -e 's/"$/ /') )
+  fi
 
+  # Remove the tmpfiles
+  rm -f "$tmpfile"*
   # Echo out the -Ss formatted package information
   total="${#name[@]}"
   for ((i=0 ; i<$total ; i++)); do
