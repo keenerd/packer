@@ -3,8 +3,9 @@
 # Licensed under GPL version 3
 
 tmpfile="/tmp/packeroutput-$UID"
-if type pacman-color &>/dev/null; then
-  outputpacman='pacman-color'
+pacman="$(type -p pacman)"
+outputpacman="$(type -p pacman-color)"
+if [[ $outputpacman ]]; then
   COLOR1='\e[1;39m'
   COLOR2='\e[1;32m'
   COLOR3='\e[1;35m'
@@ -13,7 +14,7 @@ if type pacman-color &>/dev/null; then
   COLOR6='\e[1;33m'
   ENDCOLOR='\e[0m'
 else
-  outputpacman='pacman'
+  outputpacman="$pacman"
 fi
 
 err() {
@@ -32,6 +33,19 @@ usage() {
   exit
 }
 
+# Called whenever anything needs to be run as root ($@ is the command
+runasroot() {
+  if [[ $UID -eq 0 ]]; then
+    "$@"
+  elif type sudo &>/dev/null && sudo -l "$@" &>/dev/null; then
+    sudo "$@"
+  else
+    echo -n "root "
+    # Hack: need to eval to make sure all of the args get in the single set of quotes
+    su root -c "$(eval echo $@)"
+  fi
+}
+
 # Get the json file from aur and put into tmpfile
 getjson() {
   wget -q "$1" -O- | sed -e 's/","/"\n"/g' -e 's/\\//g' > "$tmpfile"
@@ -47,12 +61,12 @@ existsinaur() {
 
 # Tests whether $1 exists in pacman
 existsinpacman() {
-  pacman -Si "$1" &>/dev/null
+  $pacman -Si "$1" &>/dev/null
 }
 
 # Tests whether $1 exists locally (i.e. is installed)
 existsinlocal() {
-  pacman -Qq "$1" &>/dev/null
+  $pacman -Qq "$1" &>/dev/null
 }
 
 # Scrapes the aur deps from PKGBUILDS and puts in globally available dependencies array
@@ -211,12 +225,10 @@ aurinstall() {
   fi
 
   [[ $? -eq 0 ]] || err "The build failed."
-  if [[ $UID -eq 0 ]]; then
-    [[ $2 = dependency ]] && $outputpacman --asdeps -U *.pkg.tar.gz
-    [[ $2 = explicit ]] && $outputpacman -U *.pkg.tar.gz
-  else
-    [[ $2 = dependency ]] && sudo $outputpacman --asdeps -U *.pkg.tar.gz
-    [[ $2 = explicit ]] && sudo $outputpacman -U *.pkg.tar.gz
+  if  [[ $2 = dependency ]]; then
+    runasroot $outputpacman --asdeps -U *.pkg.tar.gz
+  elif [[ $2 = explicit ]]; then
+    runasroot $outputpacman -U *.pkg.tar.gz
   fi
 }
 
@@ -271,20 +283,12 @@ if [[ $option = install ]]; then
 
   # If only pacman packages, then call pacman
   if [[ -n $pacmanpackages && -z $aurpackages ]]; then
-    if [[ $UID -eq 0 ]]; then
-      $outputpacman -S "${pacmanpackages[@]}"
-    else
-      sudo $outputpacman -S "${pacmanpackages[@]}"
-    fi
+    runasroot $outputpacman -S "${pacmanpackages[@]}"
     exit
   else
     # First install the explicit pacman packages, let pacman prompt
     if [[ $pacmanpackages ]]; then
-      if [[ $UID -eq 0 ]]; then
-        $outputpacman -S "${pacmanpackages[@]}"
-      else
-        sudo $outputpacman -S "${pacmanpackages[@]}"
-      fi
+      runasroot $outputpacman -S "${pacmanpackages[@]}"
     fi
 
     # Prompt for aur packages and their dependencies
@@ -300,11 +304,7 @@ if [[ $option = install ]]; then
 
     # Install pacman dependencies
     if [[ -n $pacmandepends ]]; then
-      if [[ $UID = 0 ]]; then
-        $outputpacman --asdeps --noconfirm -S "${pacmandepends[@]}" || err "Installation failed."
-      else
-        sudo $outputpacman --asdeps --noconfirm -S "${pacmandepends[@]}" || err "Installation failed."
-      fi
+      runasroot $outputpacman --asdeps --noconfirm -S "${pacmandepends[@]}" || err "Installation failed."
     fi 
 
     # Install aur dependencies
@@ -324,11 +324,7 @@ fi
 # Update (-Su) handling
 if [[ $option = update ]]; then
   # Pacman update
-  if [[ $UID = 0 ]]; then
-    $outputpacman "$1"
-  else
-    sudo $outputpacman "$1"
-  fi
+  runasroot $outputpacman "$1"
 
   # Aur update
   echo -e "${COLOR5}:: ${COLOR1}Synchronizing aur database...${ENDCOLOR}"
@@ -373,11 +369,7 @@ if [[ $option = update ]]; then
     proceed || exit
     # Install Pacman Dependencies
     if [[ -n $localpacmandeps ]]; then
-      if [[ $UID = 0 ]]; then
-        $outputpacman --asdeps --noconfirm -S "${localpacmandeps[@]}"
-      else
-        sudo $outputpacman --asdeps --noconfirm -S "${localpacmandeps[@]}"
-      fi
+      runasroot  $outputpacman --asdeps --noconfirm -S "${localpacmandeps[@]}"
     fi
 
     # Install aur dependencies
