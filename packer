@@ -78,8 +78,8 @@ finddeps() {
       elif existsinaur "$dep"; then
         aurdeps+=("$dep")
       else
-        [[ $option = "install" ]] &&  err "Dependency \`$dep' of \`$package' does not exist."
-        echo "Dependency \`$dep of \`$package' does not exist."
+        [[ $option = "install" ]] &&  err "Dependency \`$dep' of \`$1' does not exist."
+        echo "Dependency \`$dep of \`$1' does not exist."
         return 1
       fi
     fi
@@ -94,7 +94,7 @@ finddeps() {
       for aurdep in "${tmpdeps[@]}"; do
         scrapeaurdeps "$aurdep"
         for dep in "${dependencies[@]}"; do
-          if ! [[ "$package ${pacmandeps[@]} ${aurdeps[@]}" =~ "$dep" ]]; then
+          if ! [[ "$1 ${pacmandeps[@]} ${aurdeps[@]}" =~ "$dep" ]]; then
             if ! existsinlocal "$dep"; then
               if existsinpacman "$dep"; then
                 pacmandeps+=("$dep")
@@ -230,62 +230,95 @@ proceed() {
   esac
 }
 
-#Argument parsing
-package="$2"
-case "$1" in
-  '-S')    option=install ;;
-  '-Ss')   option=search ;;
-  '-Si')   option=info ;;
-  -S*u*)   option=update ;;
-  ''|'-h') usage ;;
-  *)       err "Option \`$1' is not valid." ;;
-esac
+# Argument parsing
+[[ $1 ]] || usage
+packageargs=()
+for arg in "$@"; do
+  case "$arg" in
+    '-S')          option=install ;;
+    '-Ss')         option=search ;;
+    '-Si')         option=info ;;
+    -S*u*)         option=update ;;
+    '-h'|'--help') usage ;;
+    -*)            err "Option \`$1' is not valid." ;;
+    *)             packageargs+=("$arg")
+  esac
+done
+
+# Sanity checks
+[[ $option ]] || err "No option specified."
+[[ $option != "update" && -z $packageargs ]] && err "Must specify a package."
 
 # Install (-S) handling
 if [[ $option = install ]]; then
-  # Determine whether package is in pacman repos
-  if existsinpacman "$package"; then
-    if [[ $UID = 0 ]]; then
-      $outputpacman -S "$package"
+  # Figure out all of the packages that need to be installed
+  pacmapackages=()
+  aurpackages=()
+  aurdepends=()
+  pacmandepends=()
+  for package in "${packageargs[@]}"; do
+    # Determine whether package is in pacman repos
+    if existsinpacman "$package"; then
+      pacmanpackages+=("$package")
+    else 
+      # find dependencies
+      finddeps "$package"
+      aurpackages+=("$package")
+      aurdepends+=("${aurdeps[@]}")
+      pacmandepends+=("${pacmandeps[@]}")
+    fi
+  done
+
+  # If only pacman packages, then call pacman
+  if [[ -n $pacmanpackages && -z $aurpackages ]]; then
+    if [[ $UID -eq 0 ]]; then
+      $outputpacman -S "${pacmanpackages[@]}"
     else
-      sudo $outputpacman -S "$package"
+      sudo $outputpacman -S "${pacmanpackages[@]}"
     fi
     exit
-  fi
-
-  # Scrape the aurpage for dependencies
-  echo "resolving dependencies..."
-  finddeps "$package"
-
-  # Prompt for install or not
-  echo
-  if [[ $aurdeps ]]; then
-    num="$((${#aurdeps[@]}+1))"
-    echo -e "${COLOR6}Aur Targets    ($num):${ENDCOLOR} ${aurdeps[@]} $package"
-  else 
-    echo -e "${COLOR6}Aur Targets    (1):${ENDCOLOR} $package"
-  fi
-  [[ $pacmandeps ]] && echo -e "${COLOR6}Pacman Targets (${#pacmandeps[@]}):${ENDCOLOR} ${pacmandeps[@]}"
-
-  proceed || exit
-  # Install pacman dependencies
-  if [[ -n $pacmandeps ]]; then
-    if [[ $UID = 0 ]]; then
-      $outputpacman --asdeps --noconfirm -S "${pacmandeps[@]}" || err "Installation failed."
-    else
-      sudo $outputpacman --asdeps --noconfirm -S "${pacmandeps[@]}" || err "Installation failed."
+  else
+    # First install the explicit pacman packages, let pacman prompt
+    if [[ $pacmanpackages ]]; then
+      if [[ $UID -eq 0 ]]; then
+        $outputpacman -S "${pacmanpackages[@]}"
+      else
+        sudo $outputpacman -S "${pacmanpackages[@]}"
+      fi
     fi
-  fi
 
-  # Install aur dependencies
-  if [[ -n $aurdeps ]]; then
-    for dep in "${aurdeps[@]}"; do
-      aurinstall "$dep" "dependency"
+    # Prompt for aur packages and their dependencies
+    echo
+    if [[ $aurdepends ]]; then
+      num="$((${#aurdepends[@]}+${#aurpackages[@]}))"
+      echo -e "${COLOR6}Aur Targets    ($num):${ENDCOLOR} ${aurdepends[@]} ${aurpackages[@]}"
+    else 
+      echo -e "${COLOR6}Aur Targets    ($((${#aurpackages[@]}))):${ENDCOLOR} ${aurpackages[@]}"
+    fi
+    [[ $pacmandepends ]] && echo -e "${COLOR6}Pacman Targets (${#pacmandepends[@]}):${ENDCOLOR} ${pacmandepends[@]}"
+    proceed || exit
+
+    # Install pacman dependencies
+    if [[ -n $pacmandepends ]]; then
+      if [[ $UID = 0 ]]; then
+        $outputpacman --asdeps --noconfirm -S "${pacmandepends[@]}" || err "Installation failed."
+      else
+        sudo $outputpacman --asdeps --noconfirm -S "${pacmandepends[@]}" || err "Installation failed."
+      fi
+    fi 
+
+    # Install aur dependencies
+    if [[ -n $aurdepends ]]; then
+      for dep in "${aurdepends[@]}"; do
+        aurinstall "$dep" "dependency"
+      done
+    fi 
+
+    # Install the aur packages
+    for package in "${aurpackages[@]}"; do
+      aurinstall "$package" "explicit"
     done
   fi
-
-  # Install the aur package
-  aurinstall "$package" "explicit"
 fi
 
 # Update (-Su) handling
@@ -364,10 +397,10 @@ fi
 # Search (-Ss) handling
 if [[ $option = search ]]; then
   # Pacman searching 
-  $outputpacman -Ss "$package"
+  $outputpacman -Ss "$packageargs"
 
   # Aur searching
-  getjson "http://aur.archlinux.org/rpc.php?type=search&arg=$package"
+  getjson "http://aur.archlinux.org/rpc.php?type=search&arg=$packageargs"
 
   # Fill up the arrays with package information from dump file
   IFS=$'\n'
@@ -387,51 +420,54 @@ fi
 # Info (-Si) handling
 if [[ $option = info ]]; then
   # Pacman info check
-  if existsinpacman "$package"; then
-    $outputpacman -Si "$package"
-    exit
-  else # Check to see if it is in the aur
-    wget -q "http://aur.archlinux.org/packages/$package/$package/PKGBUILD" -O "$tmpfile"
-    [[ $? -eq 0 ]] || err "No result found."
-    . "$tmpfile"
+  for package in "${packageargs[@]}"; do
+    if existsinpacman "$package"; then
+      $outputpacman -Si "$package"
+      exit
+    else # Check to see if it is in the aur
+      wget -q "http://aur.archlinux.org/packages/$package/$package/PKGBUILD" -O "$tmpfile"
+      [[ $? -eq 0 ]] || err "No result found."
+      . "$tmpfile"
 
-    # Echo out the -Si formatted package information
-    # Retrieve each element in order and echo them immediately
-    echo -e "${COLOR1}Repository     : ${COLOR3}aur"
-    echo -e "${COLOR1}Name           : $pkgname"
-    echo -e "${COLOR1}Version        : ${COLOR2}$pkgver-$pkgrel"
-    echo -e "${COLOR1}URL            : ${COLOR4}$url"
-    echo -e "${COLOR1}Licenses       : ${ENDCOLOR}${license[*]}"
+      # Echo out the -Si formatted package information
+      # Retrieve each element in order and echo them immediately
+      echo -e "${COLOR1}Repository     : ${COLOR3}aur"
+      echo -e "${COLOR1}Name           : $pkgname"
+      echo -e "${COLOR1}Version        : ${COLOR2}$pkgver-$pkgrel"
+      echo -e "${COLOR1}URL            : ${COLOR4}$url"
+      echo -e "${COLOR1}Licenses       : ${ENDCOLOR}${license[*]}"
 
-    [[ -z "${groups}" ]] && groups="None"
-    echo -e "${COLOR1}Groups         : ${ENDCOLOR}${groups[*]}"
+      [[ -z "${groups}" ]] && groups="None"
+      echo -e "${COLOR1}Groups         : ${ENDCOLOR}${groups[*]}"
 
-    [[ -z "${provides}" ]] && provides="None"
-    echo -e "${COLOR1}Provides       : ${ENDCOLOR}${provides[*]}"
+      [[ -z "${provides}" ]] && provides="None"
+      echo -e "${COLOR1}Provides       : ${ENDCOLOR}${provides[*]}"
 
-    echo -e "${COLOR1}Depends On     : ${ENDCOLOR}${depends[*]}"
+      echo -e "${COLOR1}Depends On     : ${ENDCOLOR}${depends[*]}"
 
-    echo -e -n "${COLOR1}Optional Deps  : ${ENDCOLOR}"
-    len="${#optdepends[@]}"
-    if [[ $len -eq 0 ]]; then
-      echo "None"
-    else
-      for ((i=0 ; i<$len ; i++)); do
-        if [[ $i = 0 ]]; then
-          echo "${optdepends[$i]}"
-        else
-          echo "                : ${optdepends[$i]}" 
-        fi
-      done
+      echo -e -n "${COLOR1}Optional Deps  : ${ENDCOLOR}"
+      len="${#optdepends[@]}"
+      if [[ $len -eq 0 ]]; then
+        echo "None"
+      else
+        for ((i=0 ; i<$len ; i++)); do
+          if [[ $i = 0 ]]; then
+            echo "${optdepends[$i]}"
+          else
+            echo "                : ${optdepends[$i]}" 
+          fi
+        done
+      fi
+
+      [[ -z "${conflicts}" ]] && conflicts="None"
+      echo -e "${COLOR1}Conflicts With : ${ENDCOLOR}${conflicts[*]}"
+
+      [[ -z "${replaces}" ]] && replaces="None"
+      echo -e "${COLOR1}Replaces       : ${ENDCOLOR}${replaces[*]}"
+      echo -e "${COLOR1}Architecture   : ${ENDCOLOR}${arch[*]}"
+      echo -e "${COLOR1}Description    : ${ENDCOLOR}$pkgdesc"
+      echo
     fi
-
-    [[ -z "${conflicts}" ]] && conflicts="None"
-    echo -e "${COLOR1}Conflicts With : ${ENDCOLOR}${conflicts[*]}"
-
-    [[ -z "${replaces}" ]] && replaces="None"
-    echo -e "${COLOR1}Replaces       : ${ENDCOLOR}${replaces[*]}"
-    echo -e "${COLOR1}Architecture   : ${ENDCOLOR}${arch[*]}"
-    echo -e "${COLOR1}Description    : ${ENDCOLOR}$pkgdesc"
-    echo
-  fi
+  done
 fi
+
