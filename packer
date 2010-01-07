@@ -339,7 +339,7 @@ if [[ $option = update ]]; then
   for ((i=0; i<$total; i++)); do 
     aurbar "$((i+1))" "$total"
     if aurversionisnewer "${packages[$i]%% *}" "${packages[$i]##* }"; then
-      newpackages+=("${package[$i]%% *}")
+      newpackages+=("${packages[$i]%% *}")
     fi
   done
   echo
@@ -362,11 +362,13 @@ if [[ $option = update ]]; then
 
     echo
     if [[ $localaurdeps ]]; then
-      echo "Aur Targets    : ${localaurdeps[@]} ${localpackages[@]}"
+      num="$((${#localaurdeps[@]}+${#localpackages[@]}))"
+      echo -e "${COLOR6}Aur Targets    ($num):${ENDCOLOR} ${localaurdeps[@]} ${localpackages[@]}"
     else 
-      echo "Aur Targets    : ${localpackages[@]}"
+      num="$((${#localpackages[@]}))"
+      echo -e "${COLOR6}Aur Targets    ($num):${ENDCOLOR} ${localpackages[@]}"
     fi
-    [[ $localpacmandeps ]] && echo "Pacman Targets : ${pacmandeps[@]}"
+    [[ $localpacmandeps ]] && echo -e "${COLOR6}Pacman Targets ($((${#pacmandeps[@]}))):${ENDCOLOR} ${pacmandeps[@]}"
 
     proceed || exit
     # Install Pacman Dependencies
