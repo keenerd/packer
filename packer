@@ -169,7 +169,7 @@ aurversionisnewer() {
   getjson "http://aur.archlinux.org/rpc.php?type=info&arg=$1"
   unset aurversion
   if ! grep -Fq ':"No result found"' "$tmpfile"; then
-    aurversion="$(grep -F "\"Version\":\"" "$tmpfile" | cut -d '"' -f 4)"
+    aurversion="$(grep -F '"Version":"' "$tmpfile" | cut -d '"' -f 4)"
     if [[ "$(vercmp "$aurversion" "$2")" -eq 1  ]]; then
       return 0
     else
