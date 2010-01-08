@@ -449,8 +449,7 @@ if [[ $option = search ]]; then
   # Echo out the -Ss formatted package information
   total="${#name[@]}"
   for ((i=0 ; i<$total ; i++)); do
-    echo -e "${COLOR3}aur/${COLOR1}${name[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}"
-    echo "    ${description[$i]}"
+    echo -e "${COLOR3}aur/${COLOR1}${name[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}\n    ${description[$i]}"
   done
 
   # Remove the tmpfiles
