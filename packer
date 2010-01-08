@@ -261,7 +261,7 @@ while [[ $1 ]]; do
     '-Si')         option=info ;;
     -S*u*)         option=update ; pacmanarg="$1" ;;
     '-h'|'--help') usage ;;
-    '--')          shift ; packageargs+=("$@") ;;
+    '--')          shift ; packageargs+=("$@") ; break ;;
     -*)            err "Option \`$1' is not valid." ;;
     *)             packageargs+=("$1") ;;
   esac
