@@ -61,16 +61,16 @@ existsinaur() {
 
 # Tests whether $1 exists in pacman
 existsinpacman() {
-  $pacman -Si "$1" &>/dev/null
+  $pacman -Si -- "$1" &>/dev/null
 }
 
 # Tests whether $1 exists locally or is provided for locally
 existsinlocal() {
-  $pacman -Qq "$1" &>/dev/null && return 0
+  $pacman -Qq -- "$1" &>/dev/null && return 0
   
   # Check for provides -Qqs might lead to false positives, so have to check further
   for candidate in $(pacman -Qqs "$1"); do
-    if pacman -Qi "$candidate" | grep -q "^Provides.* $1 "; then
+    if pacman -Qi -- "$candidate" | grep -q "^Provides.* $1 "; then
       return 0
     fi
   done
@@ -254,16 +254,18 @@ proceed() {
 # Argument parsing
 [[ $1 ]] || usage
 packageargs=()
-for arg in "$@"; do
-  case "$arg" in
+while [[ $1 ]]; do
+  case "$1" in
     '-S')          option=install ;;
     '-Ss')         option=search ;;
     '-Si')         option=info ;;
     -S*u*)         option=update ;;
     '-h'|'--help') usage ;;
+    '--')          shift ; packageargs+=("$@") ;;
     -*)            err "Option \`$1' is not valid." ;;
-    *)             packageargs+=("$arg")
+    *)             packageargs+=("$1") ;;
   esac
+  shift
 done
 
 # Sanity checks
@@ -292,12 +294,12 @@ if [[ $option = install ]]; then
 
   # If only pacman packages, then call pacman
   if [[ -n $pacmanpackages && -z $aurpackages ]]; then
-    runasroot $outputpacman -S "${pacmanpackages[@]}"
+    runasroot $outputpacman -S -- "${pacmanpackages[@]}"
     exit
   else
     # First install the explicit pacman packages, let pacman prompt
     if [[ $pacmanpackages ]]; then
-      runasroot $outputpacman -S "${pacmanpackages[@]}"
+      runasroot $outputpacman -S -- "${pacmanpackages[@]}"
     fi
 
     # Prompt for aur packages and their dependencies
@@ -313,7 +315,7 @@ if [[ $option = install ]]; then
 
     # Install pacman dependencies
     if [[ -n $pacmandepends ]]; then
-      runasroot $outputpacman --asdeps --noconfirm -S "${pacmandepends[@]}" || err "Installation failed."
+      runasroot $outputpacman --asdeps --noconfirm -S -- "${pacmandepends[@]}" || err "Installation failed."
     fi 
 
     # Install aur dependencies
@@ -378,7 +380,7 @@ if [[ $option = update ]]; then
     proceed || exit
     # Install Pacman Dependencies
     if [[ -n $localpacmandeps ]]; then
-      runasroot  $outputpacman --asdeps --noconfirm -S "${localpacmandeps[@]}"
+      runasroot  $outputpacman --asdeps --noconfirm -S -- "${localpacmandeps[@]}"
     fi
 
     # Install aur dependencies
@@ -400,7 +402,7 @@ fi
 # Search (-Ss) handling
 if [[ $option = search ]]; then
   # Pacman searching 
-  $outputpacman -Ss "${packageargs[@]}"
+  $outputpacman -Ss -- "${packageargs[@]}"
 
   # If only one search term, get output a certain quick way
   if  [[ ${#packageargs[@]} -eq 1 ]]; then
@@ -439,7 +441,7 @@ if [[ $option = info ]]; then
   # Pacman info check
   for package in "${packageargs[@]}"; do
     if existsinpacman "$package"; then
-      $outputpacman -Si "$package"
+      $outputpacman -Si -- "$package"
       exit
     else # Check to see if it is in the aur
       wget -q "http://aur.archlinux.org/packages/$package/$package/PKGBUILD" -O "$tmpfile"
@@ -487,4 +489,3 @@ if [[ $option = info ]]; then
     fi
   done
 fi
-
