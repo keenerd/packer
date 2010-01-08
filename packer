@@ -33,7 +33,7 @@ usage() {
   exit
 }
 
-# Called whenever anything needs to be run as root ($@ is the command
+# Called whenever anything needs to be run as root ($@ is the command)
 runasroot() {
   if [[ $UID -eq 0 ]]; then
     "$@"
@@ -161,7 +161,7 @@ aurversionisnewer() {
   unset aurversion
   if ! grep -Fq ':"No result found"' "$tmpfile"; then
     aurversion="$(grep -F Version "$tmpfile" | cut -d '"' -f 4)"
-    if [[ $aurversion > $2 ]]; then
+    if [[ "$(vercmp "$aurversion" "$2")" -eq 1  ]]; then
       return 0
     else
       return 1
