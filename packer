@@ -185,7 +185,8 @@ aurinstall() {
   dir="/tmp/packer-$UID/$1"
 
   # Prepare the installation directory
-  if [[ -f $dir/$1/PKGBUILD ]]; then
+  # If there is an old directory and aurversion is not newer, use old directory
+  if . "$dir/$1/PKGBUILD" &>/dev/null && ! aurversionisnewer "$1" "$pkgver"; then
     cd "$dir/$1"
   else
     [[ -d $dir ]] && rm -rf $dir
