@@ -259,7 +259,7 @@ while [[ $1 ]]; do
     '-S')          option=install ;;
     '-Ss')         option=search ;;
     '-Si')         option=info ;;
-    -S*u*)         option=update ;;
+    -S*u*)         option=update ; pacmanarg="$1" ;;
     '-h'|'--help') usage ;;
     '--')          shift ; packageargs+=("$@") ;;
     -*)            err "Option \`$1' is not valid." ;;
@@ -335,7 +335,7 @@ fi
 # Update (-Su) handling
 if [[ $option = update ]]; then
   # Pacman update
-  runasroot $outputpacman "$1"
+  runasroot $outputpacman "$pacmanarg"
 
   # Aur update
   echo -e "${COLOR5}:: ${COLOR1}Synchronizing aur database...${ENDCOLOR}"
