@@ -3,6 +3,7 @@
 # Licensed under GPL version 3
 
 tmpfile="/tmp/packeroutput-$UID"
+makepkgconf="/etc/makepkg.conf"
 pacman="$(type -p pacman)"
 outputpacman="$(type -p pacman-color)"
 if [[ $outputpacman ]]; then
@@ -44,6 +45,11 @@ runasroot() {
     # Hack: need to echo to make sure all of the args get in the single set of quotes
     su root -c "$(echo $@)"
   fi
+}
+
+# Source makepkg.conf file
+sourcemakepkgconf() {
+  . "$makepkgconf"
 }
 
 # Get the json file from aur and put into tmpfile
@@ -278,6 +284,7 @@ done
 
 # Install (-S) handling
 if [[ $option = install ]]; then
+  sourcemakepkgconf
   # Figure out all of the packages that need to be installed
   pacmapackages=()
   aurpackages=()
@@ -367,6 +374,7 @@ if [[ $option = update ]]; then
 
   echo -e "${COLOR5}:: ${COLOR1}Starting full aur upgrade...${ENDCOLOR}"
   if [[ $newpackages ]]; then
+    sourcemakepkgconf
     echo "resolving dependencies..."
     localpackages=()
     localaurdeps=()
@@ -453,6 +461,7 @@ fi
 # Info (-Si) handling
 if [[ $option = info ]]; then
   # Pacman info check
+  sourcemakepkgconf
   for package in "${packageargs[@]}"; do
     if existsinpacman "$package"; then
       $outputpacman -Si -- "$package"
