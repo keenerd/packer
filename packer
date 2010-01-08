@@ -70,7 +70,7 @@ existsinlocal() {
   
   # Check for provides -Qqs might lead to false positives, so have to check further
   for candidate in $(pacman -Qqs "$1"); do
-    if pacman -Qi "$candidate" | grep -q "^Provides.*$1 "; then
+    if pacman -Qi "$candidate" | grep -q "^Provides.* $1 "; then
       return 0
     fi
   done
