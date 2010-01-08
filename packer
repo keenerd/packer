@@ -64,10 +64,13 @@ existsinpacman() {
   $pacman -Si -- "$1" &>/dev/null
 }
 
-# Tests whether $1 exists locally or is provided for locally
+# Tests whether $1 exists locally
 existsinlocal() {
-  $pacman -Qq -- "$1" &>/dev/null && return 0
-  
+  $pacman -Qq -- "$1" &>/dev/null
+}
+
+# Tests whether $1 is provided for locally
+providedinlocal() {
   # Check for provides -Qqs might lead to false positives, so have to check further
   for candidate in $(pacman -Qqs "$1"); do
     if pacman -Qi -- "$candidate" | grep -q "^Provides.* $1 "; then
@@ -95,7 +98,7 @@ finddeps() {
   pacmandeps=()
   aurdeps=()
   for dep in "${dependencies[@]}"; do
-    if ! existsinlocal "$dep"; then
+    if ! existsinlocal "$dep" && ! providedinlocal "$dep"; then
       if existsinpacman "$dep"; then
         pacmandeps+=("$dep")
       elif existsinaur "$dep"; then
@@ -118,7 +121,7 @@ finddeps() {
         scrapeaurdeps "$aurdep"
         for dep in "${dependencies[@]}"; do
           if ! [[ "$1 ${pacmandeps[@]} ${aurdeps[@]}" =~ "$dep" ]]; then
-            if ! existsinlocal "$dep"; then
+            if ! existsinlocal "$dep" && ! providedinlocal "$dep"; then
               if existsinpacman "$dep"; then
                 pacmandeps+=("$dep")
               elif existsinaur "$dep"; then
@@ -302,6 +305,16 @@ if [[ $option = install ]]; then
     if [[ $pacmanpackages ]]; then
       runasroot $outputpacman -S -- "${pacmanpackages[@]}"
     fi
+
+    # Test if aurpackages are already installed; echo warning if so
+    for pkg in "${aurpackages[@]}"; do
+      if existsinlocal "$pkg"; then
+        localversion="$(pacman -Qs "$pkg" | grep -F "local/$pkg" | cut -d ' ' -f 2)"
+        if ! aurversionisnewer "$pkg" "$localversion"; then
+          echo -e "${COLOR6}warning:$ENDCOLOR $pkg-$localversion is up to date -- reinstalling"
+        fi
+      fi
+    done
 
     # Prompt for aur packages and their dependencies
     echo
