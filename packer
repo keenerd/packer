@@ -88,6 +88,7 @@ scrapeaurdeps() {
 # Sets pacmandeps and aurdeps array, which can be accessed globally after function runs
 finddeps() {
   # loop through dependencies, if not installed, determine if pacman or aur deps
+  echo "resolving dependencies..."
   pacmandeps=()
   aurdeps=()
   scrapeaurdeps "$1" 
