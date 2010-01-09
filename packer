@@ -99,21 +99,20 @@ scrapeaurdeps() {
 # Finds dependencies of package $1
 # Sets pacmandeps and aurdeps array, which can be accessed globally after function runs
 finddeps() {
-  scrapeaurdeps "$1" 
   # loop through dependencies, if not installed, determine if pacman or aur deps
   pacmandeps=()
   aurdeps=()
-  for dep in "${dependencies[@]}"; do
-    if ! existsinlocal "$dep" && ! providedinlocal "$dep"; then
-      if existsinpacman "$dep"; then
-        pacmandeps+=("$dep")
-      elif existsinaur "$dep"; then
-        aurdeps+=("$dep")
-      else
-        [[ $option = "install" ]] &&  err "Dependency \`$dep' of \`$1' does not exist."
-        echo "Dependency \`$dep of \`$1' does not exist."
-        return 1
-      fi
+  scrapeaurdeps "$1" 
+  missingdeps=( $(pacman -T "${dependencies[@]}") )
+  for dep in "${missingdeps[@]}"; do
+    if existsinpacman "$dep"; then
+      pacmandeps+=("$dep")
+    elif existsinaur "$dep"; then
+      aurdeps+=("$dep")
+    else
+      [[ $option = "install" ]] &&  err "Dependency \`$dep' of \`$1' does not exist."
+      echo "Dependency \`$dep of \`$1' does not exist."
+      return 1
     fi
   done
 
@@ -125,17 +124,16 @@ finddeps() {
       checkdeps=()
       for aurdep in "${tmpdeps[@]}"; do
         scrapeaurdeps "$aurdep"
-        for dep in "${dependencies[@]}"; do
+        missingdeps=( $(pacman -T "${dependencies[@]}") )
+        for dep in "${missingdeps[@]}"; do
           if ! [[ "$1 ${pacmandeps[@]} ${aurdeps[@]}" =~ "$dep" ]]; then
-            if ! existsinlocal "$dep" && ! providedinlocal "$dep"; then
-              if existsinpacman "$dep"; then
-                pacmandeps+=("$dep")
-              elif existsinaur "$dep"; then
-                aurdeps+=("$dep")
-                checkdeps+=("$dep")
-              else
-                err "Dependency \`$dep' does not exist."
-              fi
+            if existsinpacman "$dep"; then
+              pacmandeps+=("$dep")
+            elif existsinaur "$dep"; then
+              aurdeps+=("$dep")
+              checkdeps+=("$dep")
+            else
+              err "Dependency \`$dep' does not exist."
             fi
           fi
         done
