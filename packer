@@ -75,18 +75,6 @@ existsinlocal() {
   $pacman -Qq -- "$1" &>/dev/null
 }
 
-# Tests whether $1 is provided for locally
-providedinlocal() {
-  # Check for provides -Qqs might lead to false positives, so have to check further
-  for candidate in $(pacman -Qqs "$1"); do
-    if pacman -Qi -- "$candidate" | grep -q "^Provides.* $1 "; then
-      return 0
-    fi
-  done
-  
-  return 1
-}
-
 # Scrapes the aur deps from PKGBUILDS and puts in globally available dependencies array
 scrapeaurdeps() {
   wget -q "http://aur.archlinux.org/packages/$1/$1/PKGBUILD" -O "$tmpfile"
