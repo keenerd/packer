@@ -118,7 +118,7 @@ finddeps() {
             if existsinpacman "$dep"; then
               pacmandeps+=("$dep")
             elif existsinaur "$dep"; then
-              aurdeps+=("$dep")
+              aurdeps=("$dep" "${aurdeps[@]}")
               checkdeps+=("$dep")
             else
               err "Dependency \`$dep' does not exist."
@@ -231,9 +231,9 @@ aurinstall() {
 
   [[ $? -eq 0 ]] || err "The build failed."
   if  [[ $2 = dependency ]]; then
-    runasroot $outputpacman --asdeps -U *.pkg.tar.gz
+    runasroot $outputpacman --asdeps -U "$pkgname-$pkgver-$pkgrel-$CARCH.pkg.tar.gz"
   elif [[ $2 = explicit ]]; then
-    runasroot $outputpacman -U *.pkg.tar.gz
+    runasroot $outputpacman -U "$pkgname-$pkgver-$pkgrel-$CARCH.pkg.tar.gz"
   fi
 }
 
