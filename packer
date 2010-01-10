@@ -231,9 +231,9 @@ aurinstall() {
 
   [[ $? -eq 0 ]] || err "The build failed."
   if  [[ $2 = dependency ]]; then
-    runasroot $outputpacman --asdeps -U "$pkgname-$pkgver-$pkgrel-$CARCH.pkg.tar.gz"
+    runasroot $outputpacman --asdeps -U "$pkgname-*-$CARCH.pkg.tar.gz"
   elif [[ $2 = explicit ]]; then
-    runasroot $outputpacman -U "$pkgname-$pkgver-$pkgrel-$CARCH.pkg.tar.gz"
+    runasroot $outputpacman -U "$pkgname-*-$CARCH.pkg.tar.gz"
   fi
 }
 
