@@ -229,7 +229,7 @@ aurinstall() {
     makepkg -f
   fi
 
-  [[ $? -eq 0 ]] || err "The build failed."
+  [[ $? -ne 0 ]] && echo "The build failed." && return 1
   if  [[ $2 = dependency ]]; then
     runasroot $outputpacman --asdeps -U "$pkgname-*-$CARCH.pkg.tar.gz"
   elif [[ $2 = explicit ]]; then
