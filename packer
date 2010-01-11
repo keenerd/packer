@@ -327,6 +327,7 @@ if [[ $option = install ]]; then
 
     # Install aur dependencies
     if [[ -n $aurdepends ]]; then
+      unset failed
       for dep in "${aurdepends[@]}"; do
         aurinstall "$dep" "dependency"
       done
@@ -334,7 +335,12 @@ if [[ $option = install ]]; then
 
     # Install the aur packages
     for package in "${aurpackages[@]}"; do
-      aurinstall "$package" "explicit"
+      scrapeaurdeps "$package"
+      if pacman -T "${dependencies[@]}" &>/dev/null; then
+        aurinstall "$package" "explicit"
+      else
+        echo "Dependencies for \`$package' are not met, not building..."
+      fi
     done
   fi
 fi
@@ -400,7 +406,12 @@ if [[ $option = update ]]; then
 
     # Install updated packages
     for package in "${localpackages[@]}"; do
-      aurinstall "$package" explicit
+      scrapeaurdeps "$package"
+      if pacman -T "${dependencies[@]}" &>/dev/null; then
+        aurinstall "$package" "explicit"
+      else
+        echo "Dependencies for \`$package' are not met, not building..."
+      fi
     done
   else
     echo " local database is up to date"
