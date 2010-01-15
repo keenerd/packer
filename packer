@@ -26,11 +26,13 @@ err() {
 usage() {
   echo "usage: packer [option] [package] [package] [...]"
   echo
-  echo "    -S       - installs package"
-  echo "    -Syu|-Su - updates all packages"
-  echo "    -Ss      - searches for package"
-  echo "    -Si      - outputs info for package"
-  echo "    -h       - outputs this message"
+  echo "    -S          - installs package"
+  echo "    -Syu|-Su    - updates all packages"
+  echo "    -Ss         - searches for package"
+  echo "    -Si         - outputs info for package"
+  echo
+  echo "    --noconfirm - Do not prompt for confirmation"
+  echo "    -h          - outputs this message"
   exit
 }
 
@@ -194,15 +196,17 @@ aurinstall() {
 
   # Allow user to edit PKGBUILD
   if [[ -f PKGBUILD ]]; then
-    echo -n "Edit $1 PKGBUILD with \$EDITOR? [Y/n] "
-    read -n 1 answer
-    echo
-    case "$answer" in
-      'Y'|'y'|'')
-        [[ $EDITOR ]] || EDITOR=vi
-        $EDITOR PKGBUILD
-        ;;
-    esac
+    if ! [[ $noconfirm ]]; then
+      echo -n "Edit $1 PKGBUILD with \$EDITOR? [Y/n] "
+      read -n 1 answer
+      echo
+      case "$answer" in
+        'Y'|'y'|'')
+          [[ $EDITOR ]] || EDITOR=vi
+          $EDITOR PKGBUILD
+          ;;
+      esac
+    fi
   else
     err "No PKGBUILD found in directory."
   fi
@@ -211,15 +215,17 @@ aurinstall() {
   unset install
   . PKGBUILD
   if [[ $install ]]; then
-    echo -n "Edit $install with \$EDITOR? [Y/n] "
-    read -n 1 answer
-    echo
-    case "$answer" in
-      'Y'|'y'|'')
-        [[ $EDITOR ]] || EDITOR=vi
-        $EDITOR "$install"
-        ;;
-    esac 
+    if ! [[ $noconfirm ]]; then
+      echo -n "Edit $install with \$EDITOR? [Y/n] "
+      read -n 1 answer
+      echo
+      case "$answer" in
+        'Y'|'y'|'')
+          [[ $EDITOR ]] || EDITOR=vi
+          $EDITOR "$install"
+          ;;
+      esac 
+    fi
   fi
 
   # Installation (makepkg and pacman)
@@ -239,12 +245,16 @@ aurinstall() {
 
 # proceed with installation prompt
 proceed() {
-  echo
-  read -r -p "Proceed with installation? [Y/n] "
-  case "$REPLY" in
-    'Y'|'y'|'') return 0 ;;
-    *)       return 1 ;;
-  esac
+  if ! [[ $noconfirm ]]; then
+    echo
+    read -r -p "Proceed with installation? [Y/n] "
+    case "$REPLY" in
+      'Y'|'y'|'') return 0 ;;
+      *)       return 1 ;;
+    esac
+  else
+    return 0
+  fi
 }
 
 # Argument parsing
@@ -257,6 +267,7 @@ while [[ $1 ]]; do
     '-Si')         option=info ;;
     -S*u*)         option=update ; pacmanarg="$1" ;;
     '-h'|'--help') usage ;;
+    '--noconfirm') noconfirm='1' ;;
     '--')          shift ; packageargs+=("$@") ; break ;;
     -*)            err "Option \`$1' is not valid." ;;
     *)             packageargs+=("$1") ;;
@@ -291,12 +302,20 @@ if [[ $option = install ]]; then
 
   # If only pacman packages, then call pacman
   if [[ -n $pacmanpackages && -z $aurpackages ]]; then
-    runasroot $outputpacman -S -- "${pacmanpackages[@]}"
+    if [[ $noconfirm ]]; then
+      runasroot $outputpacman --noconfirm -S -- "${pacmanpackages[@]}"
+    else 
+      runasroot $outputpacman -S -- "${pacmanpackages[@]}"
+    fi
     exit
   else
     # First install the explicit pacman packages, let pacman prompt
     if [[ $pacmanpackages ]]; then
-      runasroot $outputpacman -S -- "${pacmanpackages[@]}"
+      if [[ $noconfirm ]]; then
+        runasroot $outputpacman --noconfirm -S -- "${pacmanpackages[@]}"
+      else
+        runasroot $outputpacman -S -- "${pacmanpackages[@]}"
+      fi
     fi
 
     # Test if aurpackages are already installed; echo warning if so
@@ -348,7 +367,11 @@ fi
 # Update (-Su) handling
 if [[ $option = update ]]; then
   # Pacman update
-  runasroot $outputpacman "$pacmanarg"
+  if [[ $noconfirm ]]; then
+    runasroot $outputpacman --noconfirm "$pacmanarg"
+  else
+    runasroot $outputpacman "$pacmanarg"
+  fi
 
   # Aur update
   echo -e "${COLOR5}:: ${COLOR1}Synchronizing aur database...${ENDCOLOR}"
