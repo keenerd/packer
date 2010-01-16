@@ -55,6 +55,18 @@ sourcemakepkgconf() {
   . "$makepkgconf"
 }
 
+# Parse IgnorePkg from pacman.conf, put in globally accessible ignoredpackages array
+getignoredpackages() {
+  IFS=$'\n'
+  IFS="$IFS "
+  ignoredpackages=( $(grep '^IgnorePkg' "$pacmanconf" | cut -d '=' -f 2) )
+}
+
+# Checks to see if $1 is an ignored package
+isignored() {
+  echo " ${ignoredpackages[@]} " | grep -Fq " $1 "
+}
+
 # Get the json file from aur and put into tmpfile
 getjson() {
   wget -q "$1" -O- | sed -e 's/","/"\n"/g' -e 's/\\//g' > "$tmpfile"
@@ -117,7 +129,7 @@ finddeps() {
         scrapeaurdeps "$aurdep"
         missingdeps=( $(pacman -T "${dependencies[@]}") )
         for dep in "${missingdeps[@]}"; do
-          if ! echo " $1 ${aurdeps[@]} ${pacmandeps[@]} " | grep -Fxq " $dep ";  then
+          if ! echo " $1 ${aurdeps[@]} ${pacmandeps[@]} " | grep -Fq " $dep ";  then
             if existsinpacman "$dep"; then
               pacmandeps+=("$dep")
             elif existsinaur "$dep"; then
@@ -246,16 +258,11 @@ aurinstall() {
 
 # proceed with installation prompt
 proceed() {
-  if ! [[ $noconfirm ]]; then
-    echo
-    read -r -p "Proceed with installation? [Y/n] "
-    case "$REPLY" in
-      'Y'|'y'|'') return 0 ;;
-      *)       return 1 ;;
-    esac
-  else
-    return 0
-  fi
+  read -r
+  case "$REPLY" in
+    'Y'|'y'|'') return 0 ;;
+    *)       return 1 ;;
+  esac
 }
 
 # Argument parsing
@@ -282,6 +289,7 @@ done
 
 # Install (-S) handling
 if [[ $option = install ]]; then
+  getignoredpackages
   sourcemakepkgconf
   # Figure out all of the packages that need to be installed
   pacmapackages=()
@@ -301,15 +309,42 @@ if [[ $option = install ]]; then
     fi
   done
 
+
+  # Check if any aur target packages are ignored
+  aurtargets=()
+  for package in "${aurpackages[@]}"; do
+    if isignored "$package"; then
+      echo -ne "${COLOR5}:: ${COLOR1}$package is in IgnorePkg/IgnoreGroup. Install anyway?${ENDCOLOR} [Y/n] "
+      if ! [[ $noconfirm ]]; then
+        if ! proceed; then
+          continue
+        fi
+      fi
+    fi
+    aurtargets+=("$package")
+  done
+
+  # Check if any aur dependencies are ignored
+  for package in "${aurdepends[@]}"; do
+    if isignored "$package"; then
+      echo -ne "${COLOR5}:: ${COLOR1}$package is in IgnorePkg/IgnoreGroup. Install anyway?${ENDCOLOR} [Y/n] "
+      if ! [[ $noconfirm ]]; then
+        if ! proceed; then
+          err "Unresolved dependency \`$package'"
+        fi
+      fi
+    fi
+  done
+ 
   # If only pacman packages, then call pacman
-  if [[ -n $pacmanpackages && -z $aurpackages ]]; then
+  if [[ -n $pacmanpackages && -z $aurtargets ]]; then
     if [[ $noconfirm ]]; then
       runasroot $outputpacman --noconfirm -S -- "${pacmanpackages[@]}"
     else 
       runasroot $outputpacman -S -- "${pacmanpackages[@]}"
     fi
     exit
-  else
+  elif [[ -n $aurtargets ]]; then
     # First install the explicit pacman packages, let pacman prompt
     if [[ $pacmanpackages ]]; then
       if [[ $noconfirm ]]; then
@@ -320,7 +355,7 @@ if [[ $option = install ]]; then
     fi
 
     # Test if aurpackages are already installed; echo warning if so
-    for pkg in "${aurpackages[@]}"; do
+    for pkg in "${aurtargets[@]}"; do
       if existsinlocal "$pkg"; then
         localversion="$(pacman -Qs "$pkg" | grep -F "local/$pkg" | cut -d ' ' -f 2)"
         if ! aurversionisnewer "$pkg" "$localversion"; then
@@ -332,13 +367,18 @@ if [[ $option = install ]]; then
     # Prompt for aur packages and their dependencies
     echo
     if [[ $aurdepends ]]; then
-      num="$((${#aurdepends[@]}+${#aurpackages[@]}))"
-      echo -e "${COLOR6}Aur Targets    ($num):${ENDCOLOR} ${aurdepends[@]} ${aurpackages[@]}"
+      num="$((${#aurdepends[@]}+${#aurtargets[@]}))"
+      echo -e "${COLOR6}Aur Targets    ($num):${ENDCOLOR} ${aurdepends[@]} ${aurtargets[@]}"
     else 
-      echo -e "${COLOR6}Aur Targets    ($((${#aurpackages[@]}))):${ENDCOLOR} ${aurpackages[@]}"
+      echo -e "${COLOR6}Aur Targets    ($((${#aurtargets[@]}))):${ENDCOLOR} ${aurtargets[@]}"
     fi
     [[ $pacmandepends ]] && echo -e "${COLOR6}Pacman Targets (${#pacmandepends[@]}):${ENDCOLOR} ${pacmandepends[@]}"
-    proceed || exit
+
+    # Prompt to proceed
+    echo -en "\nProceed with installation? [Y/n] "
+    if ! [[ $noconfirm ]]; then
+      proceed || exit
+    fi
 
     # Install pacman dependencies
     if [[ -n $pacmandepends ]]; then
@@ -354,7 +394,7 @@ if [[ $option = install ]]; then
     fi 
 
     # Install the aur packages
-    for package in "${aurpackages[@]}"; do
+    for package in "${aurtargets[@]}"; do
       scrapeaurdeps "$package"
       if pacman -T "${dependencies[@]}" &>/dev/null; then
         aurinstall "$package" "explicit"
@@ -367,6 +407,7 @@ fi
 
 # Update (-Su) handling
 if [[ $option = update ]]; then
+  getignoredpackages
   # Pacman update
   if [[ $noconfirm ]]; then
     runasroot $outputpacman --noconfirm "$pacmanarg"
@@ -379,16 +420,28 @@ if [[ $option = update ]]; then
   IFS=$'\n'
   packages=( $(pacman -Qm) )
   newpackages=()
+  checkignores=()
   total="${#packages[@]}"
   for ((i=0; i<$total; i++)); do 
     aurbar "$((i+1))" "$total"
-    if aurversionisnewer "${packages[$i]%% *}" "${packages[$i]##* }"; then
+    if isignored "${packages[$i]%% *}"; then
+      checkignores+=("${packages[$i]}")
+    elif aurversionisnewer "${packages[$i]%% *}" "${packages[$i]##* }"; then
       newpackages+=("${packages[$i]%% *}")
     fi
   done
   echo
 
   echo -e "${COLOR5}:: ${COLOR1}Starting full aur upgrade...${ENDCOLOR}"
+
+  # Check and output ignored package update info
+  for package in "${checkignores[@]}"; do
+    if aurversionisnewer "${package%% *}" "${package##* }"; then
+      echo -e "${COLOR6}warning:${ENDCOLOR} $package: ignoring package upgrade (${package##* } => $aurversion)"
+    fi
+  done
+
+  # Now for the installation part
   if [[ $newpackages ]]; then
     sourcemakepkgconf
     echo "resolving dependencies..."
@@ -415,7 +468,12 @@ if [[ $option = update ]]; then
     fi
     [[ $localpacmandeps ]] && echo -e "${COLOR6}Pacman Targets ($((${#pacmandeps[@]}))):${ENDCOLOR} ${pacmandeps[@]}"
 
-    proceed || exit
+    # Prompt on whether to proceed
+    echo -en "\nProceed with installation? [Y/n] "
+    if ! [[ $noconfirm ]]; then
+      proceed || exit
+    fi
+
     # Install Pacman Dependencies
     if [[ -n $localpacmandeps ]]; then
       runasroot  $outputpacman --asdeps --noconfirm -S -- "${localpacmandeps[@]}"
