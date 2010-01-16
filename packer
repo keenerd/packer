@@ -330,7 +330,9 @@ if [[ $option = install ]]; then
       echo -ne "${COLOR5}:: ${COLOR1}$package is in IgnorePkg/IgnoreGroup. Install anyway?${ENDCOLOR} [Y/n] "
       if ! [[ $noconfirm ]]; then
         if ! proceed; then
-          err "Unresolved dependency \`$package'"
+          echo "Unresolved dependency \`$package'"
+          unset aurtargets
+          break
         fi
       fi
     fi
