@@ -110,13 +110,14 @@ finddeps() {
   if [[ -n $aurdeps ]]; then
     checkdeps=( "${aurdeps[@]}" )
     while [[ -n $checkdeps ]]; do
+      printf "%s\n" "$1" "${aurdeps[@]}" "${pacmandeps[@]}" > "$tmpfile.deps"
       tmpdeps=( "${checkdeps[@]}" )
       checkdeps=()
       for aurdep in "${tmpdeps[@]}"; do
         scrapeaurdeps "$aurdep"
         missingdeps=( $(pacman -T "${dependencies[@]}") )
         for dep in "${missingdeps[@]}"; do
-          if ! [[ "$1 ${pacmandeps[@]} ${aurdeps[@]}" =~ "$dep" ]]; then
+          if ! grep -Fxq "$dep" "$tmpfile.deps";  then
             if existsinpacman "$dep"; then
               pacmandeps+=("$dep")
             elif existsinaur "$dep"; then
