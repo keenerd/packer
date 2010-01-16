@@ -64,7 +64,7 @@ getignoredpackages() {
 
 # Checks to see if $1 is an ignored package
 isignored() {
-  echo " ${ignoredpackages[@]} " | grep -Fq " $1 "
+  grep -Fq " $1 " <<<" ${ignoredpackages[@]} "
 }
 
 # Get the json file from aur and put into tmpfile
