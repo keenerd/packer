@@ -284,7 +284,7 @@ while [[ $1 ]]; do
 done
 
 # Sanity checks
-[[ $option ]] || err "No option specified."
+[[ $option ]] || option="searchinstall"
 [[ $option != "update" && -z $packageargs ]] && err "Must specify a package."
 
 # Install (-S) handling
@@ -500,6 +500,50 @@ if [[ $option = update ]]; then
   else
     echo " local database is up to date"
   fi
+fi
+
+# Search install handling (No option)
+if [[ $option = searchinstall ]]; then
+  # Get the pacman output into various arrays and output
+  pacman -Ss -- "${packageargs[@]}" > "$tmpfile"
+  IFS=$'\n' ; repoline=(  $(grep -Fv '    ' "$tmpfile") )
+  repo=( "${repoline[@]%%/*}" )
+  version=( "${repoline[@]##* }" )
+  pacname=( "${repoline[@]##*/}" )
+  pacname=( "${pacname[@]%% *}" )
+  IFS='|' ; description=( $(sed 's/^[^ ].*/|/' "$tmpfile") )  
+  pactotal="${#pacname[@]}"
+  for ((i=0; i<$pactotal; i++)); do
+    echo -ne "$i ${COLOR3}${repo[$i]}/${COLOR1}${pacname[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}${description[$((i+1))]}"
+  done
+  echo
+
+  # Get the aur output into various arrays and output
+  # If only one search term, get output a certain quick way
+  if  [[ ${#packageargs[@]} -eq 1 ]]; then
+    # Fill up the arrays with package information from dump file
+    getjson "http://aur.archlinux.org/rpc.php?type=search&arg=$packageargs"
+    parsefile="$tmpfile"
+  else
+    wget -q "http://aur.archlinux.org/rpc.php?type=search&arg=$packageargs" -O- | sed -e 's/{/\n{/g' -e 's/\\//g' > "$tmpfile-0"
+    for ((i=1 ; i<${#packageargs[@]} ; i++)); do
+      grep -e "\"Name\":\".*${packageargs[$i]}.*\",\"Version" -e "\"Description\":\".*${packageargs[$i]}.*\",\"LocationID" "${tmpfile}-$((i-1))" > "$tmpfile-$i"
+    done
+    sed -e 's/","/"\n"/g' -i "$tmpfile-$((i-1))"
+    parsefile="$tmpfile-$((i-1))"
+  fi
+
+  # Prepare tmp file and arrays
+  IFS=$'\n'
+  aurname=( $(grep -F '"Name":"' "$parsefile" | cut -d '"' -f 4) )
+  version=( $(grep -F '"Version":"' "$parsefile" | cut -d '"' -f 4) )
+  description=( $(grep -F '"Description":"' "$parsefile" | sed -e 's/^"Description":"//' -e 's/"$/ /') )
+
+  # Echo out the -Ss formatted package information
+  aurtotal="${#aurname[@]}"
+  for ((i=$pactotal ; i<$aurtotal ; i++)); do
+    echo -e "$i ${COLOR3}aur/${COLOR1}${aurname[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}\n    ${description[$i]}"
+  done
 fi
 
 # Search (-Ss) handling
