@@ -256,39 +256,9 @@ aurinstall() {
   fi
 }
 
-# proceed with installation prompt
-proceed() {
-  read -r
-  case "$REPLY" in
-    'Y'|'y'|'') return 0 ;;
-    *)       return 1 ;;
-  esac
-}
-
-# Argument parsing
-[[ $1 ]] || usage
-packageargs=()
-while [[ $1 ]]; do
-  case "$1" in
-    '-S')          option=install ;;
-    '-Ss')         option=search ;;
-    '-Si')         option=info ;;
-    -S*u*)         option=update ; pacmanarg="$1" ;;
-    '-h'|'--help') usage ;;
-    '--noconfirm') noconfirm='1' ;;
-    '--')          shift ; packageargs+=("$@") ; break ;;
-    -*)            err "Option \`$1' is not valid." ;;
-    *)             packageargs+=("$1") ;;
-  esac
-  shift
-done
-
-# Sanity checks
-[[ $option ]] || option="searchinstall"
-[[ $option != "update" && -z $packageargs ]] && err "Must specify a package."
-
-# Install (-S) handling
-if [[ $option = install ]]; then
+# Goes through all of the install tests and execution ($@ is packages to be installed)
+installhandling() {
+  packageargs=("$@")
   getignoredpackages
   sourcemakepkgconf
   # Figure out all of the packages that need to be installed
@@ -405,6 +375,43 @@ if [[ $option = install ]]; then
       fi
     done
   fi
+}
+
+# proceed with installation prompt
+proceed() {
+  read -r
+  case "$REPLY" in
+    'Y'|'y'|'') return 0 ;;
+    *)       return 1 ;;
+  esac
+}
+
+# Argument parsing
+[[ $1 ]] || usage
+packageargs=()
+while [[ $1 ]]; do
+  case "$1" in
+    '-S')          option=install ;;
+    '-Ss')         option=search ;;
+    '-Si')         option=info ;;
+    -S*u*)         option=update ; pacmanarg="$1" ;;
+    '-h'|'--help') usage ;;
+    '--noconfirm') noconfirm='1' ;;
+    '--')          shift ; packageargs+=("$@") ; break ;;
+    -*)            err "Option \`$1' is not valid." ;;
+    *)             packageargs+=("$1") ;;
+  esac
+  shift
+done
+
+# Sanity checks
+[[ $option ]] || option="searchinstall"
+[[ $option != "update" && -z $packageargs ]] && err "Must specify a package."
+
+# Install (-S) handling
+if [[ $option = install ]]; then
+  installhandling "${packageargs[@]}"
+  exit
 fi
 
 # Update (-Su) handling
@@ -542,22 +549,51 @@ if [[ $option = search || $option = searchinstall ]]; then
   aurname=( $(grep -F '"Name":"' "$parsefile" | cut -d '"' -f 4) )
   version=( $(grep -F '"Version":"' "$parsefile" | cut -d '"' -f 4) )
   description=( $(grep -F '"Description":"' "$parsefile" | sed -e 's/^"Description":"//' -e 's/"$/ /') )
-  total="${#aurname[@]}"
+  aurtotal="${#aurname[@]}"
 
   # Echo out the -Ss formatted package information
   if [[ $option = search ]]; then
-    for ((i=0 ; i<$total ; i++)); do
+    for ((i=0 ; i<$aurtotal ; i++)); do
       echo -e "${COLOR3}aur/${COLOR1}${aurname[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}\n    ${description[$i]}"
     done
   else
-    for ((i=$pactotal ; i<$aurtotal ; i++)); do
-      echo -e "$i ${COLOR3}aur/${COLOR1}${aurname[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}\n    ${description[$i]}"
+    alltotal="$(($pactotal+$aurtotal))"
+    for ((i=$pactotal ; i<$alltotal ; i++)); do
+      elem="$(($i-$pactotal))"
+      echo -e "$i ${COLOR3}aur/${COLOR1}${aurname[$elem]} ${COLOR2}${version[$elem]}${ENDCOLOR}\n    ${description[$elem]}"
     done
   fi
 
   # Remove the tmpfiles
   rm -f "$tmpfile"*
-  exit 0
+
+  # Prompt and install selected numbers
+  if [[ $option = searchinstall ]]; then
+    pkglist=()
+    allpackages=( "${pacname[@]}" "${aurname[@]}" )
+
+    # Prompt for numbers
+    echo
+    echo -e "${COLOR2}Type numbers to install. Separate each number with a space.${ENDCOLOR}"
+    echo -ne "${COLOR2}Numbers: ${ENDCOLOR}"
+    read -r
+    
+    # Parse answer
+    if [[ $REPLY ]]; then
+      IFS=' '
+      for num in $REPLY; do
+        if [[ $num -lt $alltotal ]]; then
+          pkglist+=("${allpackages[$num]}")
+        else
+          err "Number \`$num' is not assigned to any of the packages."
+        fi
+      done
+    fi
+
+    # Call installhandling to take care of the packages chosen 
+    installhandling "${pkglist[@]}"
+  fi
+  exit
 fi
 
 # Info (-Si) handling
