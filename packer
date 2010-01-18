@@ -32,8 +32,9 @@ usage() {
   echo "    -Ss         - searches for package"
   echo "    -Si         - outputs info for package"
   echo
-  echo "    --noconfirm - Do not prompt for confirmation"
-  echo "    --auronly   - Only do actions for aur"
+  echo "    --noconfirm - do not prompt for confirmation"
+  echo "    --auronly   - only do actions for aur"
+  echo "    --devel     - update devel packages during -Su"
   echo "    -h          - outputs this message"
   exit
 }
@@ -181,7 +182,7 @@ aurversionisnewer() {
   unset aurversion
   if ! grep -Fq ':"No result found"' "$tmpfile"; then
     aurversion="$(grep -F '"Version":"' "$tmpfile" | cut -d '"' -f 4)"
-    if [[ "$(vercmp "$aurversion" "$2")" -eq 1  ]]; then
+    if [[ "$(vercmp "$aurversion" "$2")" -gt 1  ]]; then
       return 0
     else
       return 1
@@ -399,6 +400,7 @@ while [[ $1 ]]; do
     '-h'|'--help') usage ;;
     '--noconfirm') noconfirm='1' ;;
     '--auronly')   auronly='1' ;;
+    '--devel')     devel='1' ;;
     '--')          shift ; packageargs+=("$@") ; break ;;
     -*)            err "Option \`$1' is not valid." ;;
     *)             packageargs+=("$1") ;;
@@ -435,14 +437,33 @@ if [[ $option = update ]]; then
   newpackages=()
   checkignores=()
   total="${#packages[@]}"
-  for ((i=0; i<$total; i++)); do 
-    aurbar "$((i+1))" "$total"
-    if isignored "${packages[$i]%% *}"; then
-      checkignores+=("${packages[$i]}")
-    elif aurversionisnewer "${packages[$i]%% *}" "${packages[$i]##* }"; then
-      newpackages+=("${packages[$i]%% *}")
+  if [[ $devel ]]; then
+    for ((i=0; i<$total; i++)); do 
+      aurbar "$((i+1))" "$total"
+      if isignored "${packages[$i]%% *}"; then
+        checkignores+=("${packages[$i]}")
+      else
+        unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
+        wget -q "http://aur.archlinux.org/packages/${packages[$i]%% *}/${packages[$i]%% *}/PKGBUILD" -O "$tmpfile"
+        [[ $? -eq 0 ]] || continue
+        . "$tmpfile"
+        if [[ "$(vercmp "$pkgver" "${packages[$i]##* }")" -gt 0 ]]; then
+          newpackages+=("${packages[$i]%% *}")
+        elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
+          newpackages+=("${packages[$i]%% *}")
+        fi
+      fi
+    done
+  else
+    for ((i=0; i<$total; i++)); do 
+      aurbar "$((i+1))" "$total"
+      if isignored "${packages[$i]%% *}"; then
+        checkignores+=("${packages[$i]}")
+      elif aurversionisnewer "${packages[$i]%% *}" "${packages[$i]##* }"; then
+        newpackages+=("${packages[$i]%% *}")
     fi
-  done
+    done
+  fi
   echo
 
   echo -e "${COLOR5}:: ${COLOR1}Starting full aur upgrade...${ENDCOLOR}"
