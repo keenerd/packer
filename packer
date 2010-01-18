@@ -87,6 +87,11 @@ existsinpacman() {
   $pacman -Si -- "$1" &>/dev/null
 }
 
+# Tests whether $1 exists in a pacman group
+existsinpacmangroup() {
+  [[ $($pacman -Sgq "$1") ]]
+}
+
 # Tests whether $1 exists locally
 existsinlocal() {
   $pacman -Qq -- "$1" &>/dev/null
@@ -272,7 +277,9 @@ installhandling() {
     # Determine whether package is in pacman repos
     if ! [[ $auronly ]] && existsinpacman "$package"; then
       pacmanpackages+=("$package")
-    else 
+    elif existsinpacmangroup "$package"; then
+      pacmanpackages+=("$package")
+    else
       # find dependencies
       finddeps "$package"
       aurpackages+=("$package")
