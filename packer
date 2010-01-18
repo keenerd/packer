@@ -33,6 +33,7 @@ usage() {
   echo "    -Si         - outputs info for package"
   echo
   echo "    --noconfirm - Do not prompt for confirmation"
+  echo "    --auronly   - Only do actions for aur"
   echo "    -h          - outputs this message"
   exit
 }
@@ -268,7 +269,7 @@ installhandling() {
   pacmandepends=()
   for package in "${packageargs[@]}"; do
     # Determine whether package is in pacman repos
-    if existsinpacman "$package"; then
+    if ! [[ $auronly ]] && existsinpacman "$package"; then
       pacmanpackages+=("$package")
     else 
       # find dependencies
@@ -397,6 +398,7 @@ while [[ $1 ]]; do
     -S*u*)         option=update ; pacmanarg="$1" ;;
     '-h'|'--help') usage ;;
     '--noconfirm') noconfirm='1' ;;
+    '--auronly')   auronly='1' ;;
     '--')          shift ; packageargs+=("$@") ; break ;;
     -*)            err "Option \`$1' is not valid." ;;
     *)             packageargs+=("$1") ;;
@@ -418,10 +420,12 @@ fi
 if [[ $option = update ]]; then
   getignoredpackages
   # Pacman update
-  if [[ $noconfirm ]]; then
-    runasroot $outputpacman --noconfirm "$pacmanarg"
-  else
-    runasroot $outputpacman "$pacmanarg"
+  if ! [[ $auronly ]]; then
+    if [[ $noconfirm ]]; then
+      runasroot $outputpacman --noconfirm "$pacmanarg"
+    else
+      runasroot $outputpacman "$pacmanarg"
+    fi
   fi
 
   # Aur update
@@ -512,22 +516,26 @@ fi
 # Search (-Ss) handling
 if [[ $option = search || $option = searchinstall ]]; then
   # Pacman searching 
-  if [[ $option = search ]]; then
-    $outputpacman -Ss -- "${packageargs[@]}"
+  if ! [[ $auronly ]]; then
+    if [[ $option = search ]]; then
+      $outputpacman -Ss -- "${packageargs[@]}"
+    else
+      # Get the pacman output into various arrays and output
+      pacman -Ss -- "${packageargs[@]}" > "$tmpfile"
+      IFS=$'\n' ; repoline=(  $(grep -Fv '    ' "$tmpfile") )
+      repo=( "${repoline[@]%%/*}" )
+      version=( "${repoline[@]##* }" )
+      pacname=( "${repoline[@]##*/}" )
+      pacname=( "${pacname[@]%% *}" )
+      IFS=$'\a' ; description=( $(sed 's/^[^ ].*/\a/' "$tmpfile") )  
+      pactotal="${#pacname[@]}"
+      for ((i=0; i<$pactotal; i++)); do
+        echo -ne "$i ${COLOR3}${repo[$i]}/${COLOR1}${pacname[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}${description[$((i+1))]}"
+      done
+      echo
+    fi
   else
-    # Get the pacman output into various arrays and output
-    pacman -Ss -- "${packageargs[@]}" > "$tmpfile"
-    IFS=$'\n' ; repoline=(  $(grep -Fv '    ' "$tmpfile") )
-    repo=( "${repoline[@]%%/*}" )
-    version=( "${repoline[@]##* }" )
-    pacname=( "${repoline[@]##*/}" )
-    pacname=( "${pacname[@]%% *}" )
-    IFS=$'\a' ; description=( $(sed 's/^[^ ].*/\a/' "$tmpfile") )  
-    pactotal="${#pacname[@]}"
-    for ((i=0; i<$pactotal; i++)); do
-      echo -ne "$i ${COLOR3}${repo[$i]}/${COLOR1}${pacname[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}${description[$((i+1))]}"
-    done
-    echo
+    pactotal=0
   fi
 
   # Aur searching and tmpfile preparation
@@ -601,7 +609,7 @@ if [[ $option = info ]]; then
   # Pacman info check
   sourcemakepkgconf
   for package in "${packageargs[@]}"; do
-    if existsinpacman "$package"; then
+    if ! [[ $auronly ]] && existsinpacman "$package"; then
       $outputpacman -Si -- "$package"
       exit
     else # Check to see if it is in the aur
