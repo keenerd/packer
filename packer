@@ -522,7 +522,7 @@ if [[ $option = search || $option = searchinstall ]]; then
     version=( "${repoline[@]##* }" )
     pacname=( "${repoline[@]##*/}" )
     pacname=( "${pacname[@]%% *}" )
-    IFS='|' ; description=( $(sed 's/^[^ ].*/|/' "$tmpfile") )  
+    IFS=$'\t' ; description=( $(sed 's/^[^ ].*/\t/' "$tmpfile") )  
     pactotal="${#pacname[@]}"
     for ((i=0; i<$pactotal; i++)); do
       echo -ne "$i ${COLOR3}${repo[$i]}/${COLOR1}${pacname[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}${description[$((i+1))]}"
