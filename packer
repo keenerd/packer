@@ -66,14 +66,13 @@ getignoredpackages() {
 
 # Checks to see if $1 is an ignored package
 isignored() {
-  grep -Fq " $1 " <<<" ${ignoredpackages[@]} "
+  [[ " ${ignoredpackages[@]} " =~ " $1 " ]]
 }
 
 # Tests whether $1 exists on the aur
 existsinaur() {
   wget -q "http://aur.archlinux.org/rpc.php?type=info&arg=$1" -O "$tmpfile"
-  grep -Fq ':"No result found"' "$tmpfile" && return 1
-  return 0
+  ! grep -Fq ':"No result found"' "$tmpfile"
 }
 
 # Tests whether $1 exists in pacman
