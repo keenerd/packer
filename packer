@@ -129,7 +129,7 @@ finddeps() {
         scrapeaurdeps "$aurdep"
         missingdeps=( $(pacman -T "${dependencies[@]}") )
         for dep in "${missingdeps[@]}"; do
-          if ! echo " $1 ${aurdeps[@]} ${pacmandeps[@]} " | grep -Fq " $dep ";  then
+          if ! [[ " $1 ${aurdeps[@]} ${pacmandeps[@]} " =~ " $dep " ]];  then
             if existsinpacman "$dep"; then
               pacmandeps+=("$dep")
             elif existsinaur "$dep"; then
