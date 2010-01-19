@@ -24,12 +24,6 @@ err() {
   exit 1
 }
 
-# Runs if user hits ctrl+c at any point
-trap ctrlc INT
-ctrlc() {
-  err "\nInterrupt signal received"
-}
-
 usage() {
   echo "usage: packer [option] [package] [package] [...]"
   echo
