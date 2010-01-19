@@ -69,15 +69,9 @@ isignored() {
   grep -Fq " $1 " <<<" ${ignoredpackages[@]} "
 }
 
-# Get the json file from aur and put into tmpfile
-getjson() {
-  wget -q "$1" -O- | sed -e 's/","/"\n"/g' -e 's/\\//g' > "$tmpfile"
-  [[ $? -ne 0 ]] && err "Downloading failed."
-}
-
-# Tests whether $1 exists on the aur (uses getjson function from above)
+# Tests whether $1 exists on the aur
 existsinaur() {
-  getjson "http://aur.archlinux.org/rpc.php?type=info&arg=$1"
+  wget -q "http://aur.archlinux.org/rpc.php?type=info&arg=$1" -O "$tmpfile"
   grep -Fq ':"No result found"' "$tmpfile" && return 1
   return 0
 }
@@ -569,7 +563,7 @@ if [[ $option = search || $option = searchinstall ]]; then
   # Aur searching and tmpfile preparation
   if  [[ ${#packageargs[@]} -eq 1 ]]; then
     # Fill up the arrays with package information from dump file
-    getjson "http://aur.archlinux.org/rpc.php?type=search&arg=$packageargs"
+    wget -q "http://aur.archlinux.org/rpc.php?type=search&arg=$packageargs" -O- | sed -e 's/","/"\n"/g' -e 's/\\//g' > "$tmpfile" 
     parsefile="$tmpfile"
   else
     wget -q "http://aur.archlinux.org/rpc.php?type=search&arg=$packageargs" -O- | sed -e 's/{/\n{/g' -e 's/\\//g' > "$tmpfile-0"
