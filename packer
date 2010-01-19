@@ -3,8 +3,6 @@
 # Licensed under GPL version 3
 
 tmpfile="/tmp/packeroutput-$UID"
-makepkgconf="/etc/makepkg.conf"
-pacmanconf="/etc/pacman.conf"
 pacman="$(type -p pacman)"
 outputpacman="$(type -p pacman-color)"
 if [[ $outputpacman ]]; then
@@ -35,6 +33,7 @@ usage() {
   echo "    --noconfirm - do not prompt for confirmation"
   echo "    --auronly   - only do actions for aur"
   echo "    --devel     - update devel packages during -Su"
+  echo "    --skipinteg - when using makepkg, do not check md5s"
   echo "    -h          - outputs this message"
   exit
 }
@@ -243,9 +242,9 @@ aurinstall() {
 
   # Installation (makepkg and pacman)
   if [[ $UID -eq 0 ]]; then
-    makepkg --asroot -f
+    makepkg $MAKEPKGOPTS --asroot -f
   else
-    makepkg -f
+    makepkg $MAKEPKGOPTS -f
   fi
 
   [[ $? -ne 0 ]] && echo "The build failed." && return 1
@@ -401,6 +400,7 @@ while [[ $1 ]]; do
     '--noconfirm') noconfirm='1' ;;
     '--auronly')   auronly='1' ;;
     '--devel')     devel='1' ;;
+    '--skipinteg') MAKEPKGOPTS="--skipinteg"
     '--')          shift ; packageargs+=("$@") ; break ;;
     -*)            err "Option \`$1' is not valid." ;;
     *)             packageargs+=("$1") ;;
