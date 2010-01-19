@@ -20,8 +20,14 @@ else
 fi
 
 err() {
-  echo "$1"
+  echo -e "$1"
   exit 1
+}
+
+# Runs if user hits ctrl+c at any point
+trap ctrlc INT
+ctrlc() {
+  err "\nInterrupt signal received"
 }
 
 usage() {
