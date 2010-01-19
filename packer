@@ -400,7 +400,7 @@ while [[ $1 ]]; do
     '--noconfirm') noconfirm='1' ;;
     '--auronly')   auronly='1' ;;
     '--devel')     devel='1' ;;
-    '--skipinteg') MAKEPKGOPTS="--skipinteg"
+    '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
     '--')          shift ; packageargs+=("$@") ; break ;;
     -*)            err "Option \`$1' is not valid." ;;
     *)             packageargs+=("$1") ;;
