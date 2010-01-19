@@ -3,6 +3,7 @@
 # Licensed under GPL version 3
 
 tmpfile="/tmp/packeroutput-$UID"
+makepkgconf="/tmp/makepkg.conf"
 pacman="$(type -p pacman)"
 outputpacman="$(type -p pacman-color)"
 if [[ $outputpacman ]]; then
