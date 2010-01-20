@@ -648,11 +648,9 @@ if [[ $option = info ]]; then
       echo -e "${COLOR1}URL            : ${COLOR4}$url"
       echo -e "${COLOR1}Licenses       : ${ENDCOLOR}${license[*]}"
 
-      [[ -z "${groups}" ]] && groups="None"
-      echo -e "${COLOR1}Groups         : ${ENDCOLOR}${groups[*]}"
+      echo -e "${COLOR1}Groups         : ${ENDCOLOR}${groups[*]:-None}"
 
-      [[ -z "${provides}" ]] && provides="None"
-      echo -e "${COLOR1}Provides       : ${ENDCOLOR}${provides[*]}"
+      echo -e "${COLOR1}Provides       : ${ENDCOLOR}${provides[*]:-None}"
 
       echo -e "${COLOR1}Depends On     : ${ENDCOLOR}${depends[*]}"
 
@@ -665,7 +663,7 @@ if [[ $option = info ]]; then
           if [[ $i = 0 ]]; then
             echo "${optdepends[$i]}"
           else
-            echo "                : ${optdepends[$i]}" 
+            echo -e "                 ${optdepends[$i]}" 
           fi
         done
       fi
