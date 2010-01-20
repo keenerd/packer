@@ -595,9 +595,6 @@ if [[ $option = search || $option = searchinstall ]]; then
     done
   fi
 
-  # Remove the tmpfiles
-  rm -f "$tmpfile"*
-
   # Prompt and install selected numbers
   if [[ $option = searchinstall ]]; then
     pkglist=()
@@ -624,6 +621,9 @@ if [[ $option = search || $option = searchinstall ]]; then
     # Call installhandling to take care of the packages chosen 
     installhandling "${pkglist[@]}"
   fi
+
+  # Remove the tmpfiles
+  rm -f "$tmpfile"*
   exit
 fi
 
