@@ -115,7 +115,7 @@ finddeps() {
       aurdeps+=("$dep")
     else
       [[ $option = "install" ]] &&  err "Dependency \`$dep' of \`$1' does not exist."
-      echo "Dependency \`$dep of \`$1' does not exist."
+      echo "Dependency \`$dep' of \`$1' does not exist."
       return 1
     fi
   done
@@ -137,7 +137,8 @@ finddeps() {
               aurdeps=("$dep" "${aurdeps[@]}")
               checkdeps+=("$dep")
             else
-              err "Dependency \`$dep' does not exist."
+              echo "Dependency \`$dep' does not exist."
+              return 1
             fi
           fi
         done
@@ -275,10 +276,11 @@ installhandling() {
       pacmanpackages+=("$package")
     else
       # find dependencies
-      finddeps "$package"
-      aurpackages+=("$package")
-      aurdepends+=("${aurdeps[@]}")
-      pacmandepends+=("${pacmandeps[@]}")
+      if finddeps "$package"; then
+        aurpackages+=("$package")
+        aurdepends+=("${aurdeps[@]}")
+        pacmandepends+=("${pacmandeps[@]}")
+      fi
     fi
   done
 
@@ -493,6 +495,7 @@ if [[ $option = update ]]; then
         echo "Not updating \`$package'."
       fi 
     done
+    [[ $localpackages ]] || exit
 
     echo
     if [[ $localaurdeps ]]; then
