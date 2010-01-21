@@ -671,7 +671,7 @@ if [[ $option = info ]]; then
 
       echo -e "${COLOR1}Conflicts With : ${ENDCOLOR}${conflicts[@]:-None}"
       echo -e "${COLOR1}Replaces       : ${ENDCOLOR}${replaces[@]:-None}"
-      echo -e "${COLOR1}Architecture   : ${ENDCOLOR}${arch[*]}"
+      echo -e "${COLOR1}Architecture   : ${ENDCOLOR}${arch[@]}"
       echo -e "${COLOR1}Description    : ${ENDCOLOR}$pkgdesc"
       echo
     fi
