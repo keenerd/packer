@@ -217,8 +217,7 @@ aurinstall() {
       echo
       case "$answer" in
         'Y'|'y'|'')
-          [[ $EDITOR ]] || EDITOR=vi
-          $EDITOR PKGBUILD
+          ${EDITOR:-vi} PKGBUILD
           ;;
       esac
     fi
@@ -236,8 +235,7 @@ aurinstall() {
       echo
       case "$answer" in
         'Y'|'y'|'')
-          [[ $EDITOR ]] || EDITOR=vi
-          $EDITOR "$install"
+          ${EDITOR:-vi} "$install"
           ;;
       esac 
     fi
@@ -444,27 +442,27 @@ if [[ $option = update ]]; then
   if [[ $devel ]]; then
     for ((i=0; i<$total; i++)); do 
       aurbar "$((i+1))" "$total"
-      if isignored "${packages[$i]%% *}"; then
-        checkignores+=("${packages[$i]}")
+      if isignored "${packages[i]%% *}"; then
+        checkignores+=("${packages[i]}")
       else
         unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
-        wget -q "http://aur.archlinux.org/packages/${packages[$i]%% *}/${packages[$i]%% *}/PKGBUILD" -O "$tmpfile"
+        wget -q "http://aur.archlinux.org/packages/${packages[i]%% *}/${packages[i]%% *}/PKGBUILD" -O "$tmpfile"
         [[ $? -eq 0 ]] || continue
         . "$tmpfile"
-        if [[ "$(vercmp "$pkgver" "${packages[$i]##* }")" -gt 0 ]]; then
-          newpackages+=("${packages[$i]%% *}")
+        if [[ "$(vercmp "$pkgver" "${packages[i]##* }")" -gt 0 ]]; then
+          newpackages+=("${packages[i]%% *}")
         elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
-          newpackages+=("${packages[$i]%% *}")
+          newpackages+=("${packages[i]%% *}")
         fi
       fi
     done
   else
     for ((i=0; i<$total; i++)); do 
       aurbar "$((i+1))" "$total"
-      if isignored "${packages[$i]%% *}"; then
-        checkignores+=("${packages[$i]}")
-      elif aurversionisnewer "${packages[$i]%% *}" "${packages[$i]##* }"; then
-        newpackages+=("${packages[$i]%% *}")
+      if isignored "${packages[i]%% *}"; then
+        checkignores+=("${packages[i]}")
+      elif aurversionisnewer "${packages[i]%% *}" "${packages[i]##* }"; then
+        newpackages+=("${packages[i]%% *}")
     fi
     done
   fi
@@ -671,11 +669,8 @@ if [[ $option = info ]]; then
         done
       fi
 
-      [[ -z "${conflicts}" ]] && conflicts="None"
-      echo -e "${COLOR1}Conflicts With : ${ENDCOLOR}${conflicts[*]}"
-
-      [[ -z "${replaces}" ]] && replaces="None"
-      echo -e "${COLOR1}Replaces       : ${ENDCOLOR}${replaces[*]}"
+      echo -e "${COLOR1}Conflicts With : ${ENDCOLOR}${conflicts[@]:-None}"
+      echo -e "${COLOR1}Replaces       : ${ENDCOLOR}${replaces[@]:-None}"
       echo -e "${COLOR1}Architecture   : ${ENDCOLOR}${arch[*]}"
       echo -e "${COLOR1}Description    : ${ENDCOLOR}$pkgdesc"
       echo
