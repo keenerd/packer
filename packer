@@ -121,9 +121,9 @@ finddeps() {
   done
 
   # Aur dependencies can also have aur dependencies, so find all of them
-  if [[ -n $aurdeps ]]; then
+  if [[ $aurdeps ]]; then
     checkdeps=( "${aurdeps[@]}" )
-    while [[ -n $checkdeps ]]; do
+    while [[ $checkdeps ]]; do
       tmpdeps=( "${checkdeps[@]}" )
       checkdeps=()
       for aurdep in "${tmpdeps[@]}"; do
@@ -312,14 +312,14 @@ installhandling() {
   done
  
   # If only pacman packages, then call pacman
-  if [[ -n $pacmanpackages && -z $aurtargets ]]; then
+  if [[ $pacmanpackages && -z $aurtargets ]]; then
     if [[ $noconfirm ]]; then
       runasroot $outputpacman --noconfirm -S -- "${pacmanpackages[@]}"
     else 
       runasroot $outputpacman -S -- "${pacmanpackages[@]}"
     fi
     exit
-  elif [[ -n $aurtargets ]]; then
+  elif [[ $aurtargets ]]; then
     # First install the explicit pacman packages, let pacman prompt
     if [[ $pacmanpackages ]]; then
       if [[ $noconfirm ]]; then
@@ -356,12 +356,12 @@ installhandling() {
     fi
 
     # Install pacman dependencies
-    if [[ -n $pacmandepends ]]; then
+    if [[ $pacmandepends ]]; then
       runasroot $outputpacman --asdeps --noconfirm -S -- "${pacmandepends[@]}" || err "Installation failed."
     fi 
 
     # Install aur dependencies
-    if [[ -n $aurdepends ]]; then
+    if [[ $aurdepends ]]; then
       unset failed
       for dep in "${aurdepends[@]}"; do
         aurinstall "$dep" "dependency"
@@ -512,12 +512,12 @@ if [[ $option = update ]]; then
     fi
 
     # Install Pacman Dependencies
-    if [[ -n $localpacmandeps ]]; then
+    if [[ $localpacmandeps ]]; then
       runasroot  $outputpacman --asdeps --noconfirm -S -- "${localpacmandeps[@]}"
     fi
 
     # Install aur dependencies
-    if [[ -n $localaurdeps ]]; then
+    if [[ $localaurdeps ]]; then
       for dep in "${localaurdeps[@]}"; do
         aurinstall "$dep" "dependency"
       done
