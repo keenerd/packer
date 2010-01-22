@@ -178,7 +178,7 @@ aurbar() {
   for ((n=1; n<$dashes; n++)); do
     printf "-"
   done
-  printf "${endbar}${perc}%%"
+  echo -n "${endbar}${perc}%"
 }
 
 # Checks if package is newer on aur ($1 is package name, $2 is local version)
