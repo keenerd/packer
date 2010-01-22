@@ -19,6 +19,11 @@ else
   outputpacman="$pacman"
 fi
 
+trap ctrlc INT
+ctrlc() {
+  exit
+}
+
 err() {
   echo -e "$1"
   exit 1
