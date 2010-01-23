@@ -255,9 +255,17 @@ aurinstall() {
 
   [[ $? -ne 0 ]] && echo "The build failed." && return 1
   if  [[ $2 = dependency ]]; then
-    runasroot $outputpacman --asdeps -U $pkgname-*.pkg.tar.gz
+    if [[ $PKGDEST ]]; then
+      runasroot $outputpacman --asdeps -U "$PKGDEST"/$pkgname-*.pkg.tar.gz
+    else
+      runasroot $outputpacman --asdeps -U $pkgname-*.pkg.tar.gz
+    fi
   elif [[ $2 = explicit ]]; then
-    runasroot $outputpacman -U $pkgname-*.pkg.tar.gz
+    if [[ $PKGDEST ]]; then
+      runasroot $outputpacman -U "$PKGDEST"/$pkgname-*.pkg.tar.gz
+    else
+      runasroot $outputpacman -U $pkgname-*.pkg.tar.gz
+    fi
   fi
 }
 
