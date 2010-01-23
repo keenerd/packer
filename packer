@@ -410,7 +410,7 @@ while [[ $1 ]]; do
     '-S') option=install ;;
     '-Ss') option=search ;;
     '-Si') option=info ;;
-    -S*u*) option=update ; pacmanarg="$1" ;;
+    '-Su'|'-Suy'|'-Syu'|'-Syyu'|'-Suyy'|'Syuy') option=update ; pacmanarg="$1" ;;
     '-h'|'--help') usage ;;
     '--noconfirm') noconfirm='1' ;;
     '--auronly') auronly='1' ;;
