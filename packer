@@ -37,6 +37,7 @@ usage() {
   echo '    -Ss         - searches for package'
   echo '    -Si         - outputs info for package'
   echo
+  echo '    --ignore    - takes a comma-separated list of packages to ignore'
   echo '    --noconfirm - do not prompt for confirmation'
   echo '    --auronly   - only do actions for aur'
   echo '    --devel     - update devel packages during -Su'
@@ -63,11 +64,13 @@ sourcemakepkgconf() {
   . "$makepkgconf"
 }
 
-# Parse IgnorePkg from pacman.conf, put in globally accessible ignoredpackages array
+# Parse IgnorePkg and --ignore, put in globally accessible ignoredpackages array
 getignoredpackages() {
+  IFS=','
+  ignoredpackages=($ignorearg)
   IFS=$'\n'
   IFS="$IFS "
-  ignoredpackages=( $(grep '^IgnorePkg' "$pacmanconf" | cut -d '=' -f 2) )
+  ignoredpackages+=( $(grep '^IgnorePkg' "$pacmanconf" | cut -d '=' -f 2) )
 }
 
 # Checks to see if $1 is an ignored package
@@ -133,7 +136,7 @@ finddeps() {
       checkdeps=()
       for aurdep in "${tmpdeps[@]}"; do
         scrapeaurdeps "$aurdep"
-        missingdeps=( $(pacman -T "${dependencies[@]}") )
+        missingdeps=( $($pacman -T "${dependencies[@]}") )
         for dep in "${missingdeps[@]}"; do
           if ! [[ " $1 ${aurdeps[@]} ${pacmandeps[@]} " =~ " $dep " ]];  then
             if existsinpacman "$dep"; then
@@ -326,20 +329,12 @@ installhandling() {
  
   # If only pacman packages, then call pacman
   if [[ $pacmanpackages && -z $aurtargets ]]; then
-    if [[ $noconfirm ]]; then
-      runasroot $outputpacman --noconfirm -S -- "${pacmanpackages[@]}"
-    else 
-      runasroot $outputpacman -S -- "${pacmanpackages[@]}"
-    fi
+    runasroot $outputpacman $PACOPTS -S -- "${pacmanpackages[@]}"
     exit
   elif [[ $aurtargets ]]; then
     # First install the explicit pacman packages, let pacman prompt
     if [[ $pacmanpackages ]]; then
-      if [[ $noconfirm ]]; then
-        runasroot $outputpacman --noconfirm -S -- "${pacmanpackages[@]}"
-      else
-        runasroot $outputpacman -S -- "${pacmanpackages[@]}"
-      fi
+        runasroot $outputpacman $PACOPTS -S -- "${pacmanpackages[@]}"
     fi
 
     # Test if aurpackages are already installed; echo warning if so
@@ -384,7 +379,7 @@ installhandling() {
     # Install the aur packages
     for package in "${aurtargets[@]}"; do
       scrapeaurdeps "$package"
-      if pacman -T "${dependencies[@]}" &>/dev/null; then
+      if $pacman -T "${dependencies[@]}" &>/dev/null; then
         aurinstall "$package" "explicit"
       else
         echo "Dependencies for \`$package' are not met, not building..."
@@ -412,7 +407,8 @@ while [[ $1 ]]; do
     '-Si') option=info ;;
     '-Su'|'-Suy'|'-Syu'|'-Syyu'|'-Suyy'|'Syuy') option=update ; pacmanarg="$1" ;;
     '-h'|'--help') usage ;;
-    '--noconfirm') noconfirm='1' ;;
+    '--ignore') ignorearg="$2" ; PACOPTS="$PACOPTS --ignore $2" ; shift ;;
+    '--noconfirm') noconfirm='1' PACOPTS="$PACOPTS --noconfirm";;
     '--auronly') auronly='1' ;;
     '--devel') devel='1' ;;
     '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
@@ -438,17 +434,13 @@ if [[ $option = update ]]; then
   getignoredpackages
   # Pacman update
   if ! [[ $auronly ]]; then
-    if [[ $noconfirm ]]; then
-      runasroot $outputpacman --noconfirm "$pacmanarg"
-    else
-      runasroot $outputpacman "$pacmanarg"
-    fi
+    runasroot $outputpacman $PACOPTS "$pacmanarg"
   fi
 
   # Aur update
   echo -e "${COLOR5}:: ${COLOR1}Synchronizing aur database...${ENDCOLOR}"
   IFS=$'\n'
-  packages=( $(pacman -Qm) )
+  packages=( $($pacman -Qm) )
   newpackages=()
   checkignores=()
   total="${#packages[@]}"
@@ -539,7 +531,7 @@ if [[ $option = update ]]; then
     # Install updated packages
     for package in "${localpackages[@]}"; do
       scrapeaurdeps "$package"
-      if pacman -T "${dependencies[@]}" &>/dev/null; then
+      if $pacman -T "${dependencies[@]}" &>/dev/null; then
         aurinstall "$package" "explicit"
       else
         echo "Dependencies for \`$package' are not met, not building..."
@@ -558,7 +550,7 @@ if [[ $option = search || $option = searchinstall ]]; then
       $outputpacman -Ss -- "${packageargs[@]}"
     else
       # Get the pacman output into various arrays and output
-      pacman -Ss -- "${packageargs[@]}" > "$tmpfile"
+      $pacman -Ss -- "${packageargs[@]}" > "$tmpfile"
       IFS=$'\n' ; repoline=(  $(grep -Fv '    ' "$tmpfile") )
       repo=( "${repoline[@]%%/*}" )
       version=( "${repoline[@]##* }" )
