@@ -361,6 +361,8 @@ installhandling() {
     echo -en "\nProceed with installation? [Y/n] "
     if ! [[ $noconfirm ]]; then
       proceed || exit
+    else
+      echo
     fi
 
     # Install pacman dependencies
@@ -513,6 +515,8 @@ if [[ $option = update ]]; then
     echo -en "\nProceed with installation? [Y/n] "
     if ! [[ $noconfirm ]]; then
       proceed || exit
+    else
+      echo
     fi
 
     # Install Pacman Dependencies
