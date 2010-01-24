@@ -365,12 +365,11 @@ installhandling() {
 
     # Install pacman dependencies
     if [[ $pacmandepends ]]; then
-      runasroot $outputpacman --asdeps --noconfirm -S -- "${pacmandepends[@]}" || err "Installation failed."
+      runasroot $outputpacman --noconfirm --asdeps -S -- "${pacmandepends[@]}" || err "Installation failed."
     fi 
 
     # Install aur dependencies
     if [[ $aurdepends ]]; then
-      unset failed
       for dep in "${aurdepends[@]}"; do
         aurinstall "$dep" "dependency"
       done
@@ -518,7 +517,7 @@ if [[ $option = update ]]; then
 
     # Install Pacman Dependencies
     if [[ $localpacmandeps ]]; then
-      runasroot  $outputpacman --asdeps --noconfirm -S -- "${localpacmandeps[@]}"
+      runasroot  $outputpacman --noconfirm --asdeps -S -- "${localpacmandeps[@]}" || err "Installation failed."
     fi
 
     # Install aur dependencies
