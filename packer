@@ -36,6 +36,7 @@ usage() {
   echo '    -Syu|-Su    - updates all packages'
   echo '    -Ss         - searches for package'
   echo '    -Si         - outputs info for package'
+  echo '    -G          - download and extract aur tarball only'
   echo
   echo '    --ignore    - takes a comma-separated list of packages to ignore'
   echo '    --noconfirm - do not prompt for confirmation'
@@ -407,6 +408,7 @@ while [[ $1 ]]; do
     '-Ss') option=search ;;
     '-Si') option=info ;;
     '-Su'|'-Suy'|'-Syu'|'-Syyu'|'-Suyy'|'Syuy') option=update ; pacmanarg="$1" ;;
+    '-G') option=download ;;
     '-h'|'--help') usage ;;
     '--ignore') ignorearg="$2" ; PACOPTS="$PACOPTS --ignore $2" ; shift ;;
     '--noconfirm') noconfirm='1' PACOPTS="$PACOPTS --noconfirm";;
@@ -543,6 +545,23 @@ if [[ $option = update ]]; then
   else
     echo " local database is up to date"
   fi
+fi
+
+# Download (-G) handling
+if [[ $option = download ]]; then
+  pkglist=()
+  for package in "${packageargs[@]}"; do
+    if existsinaur "$package"; then
+      pkglist+=("$package")
+    else
+      echo "Package \`$package' does not exist on aur."
+    fi
+  done
+
+  for package in "${pkglist[@]}"; do
+    wget "http://aur.archlinux.org/packages/$package/$package.tar.gz"
+    tar xf "$package.tar.gz" 
+  done
 fi
 
 # Search (-Ss) handling
