@@ -434,6 +434,7 @@ fi
 # Update (-Su) handling
 if [[ $option = update ]]; then
   getignoredpackages
+  sourcemakepkgconf
   # Pacman update
   if ! [[ $auronly ]]; then
     runasroot $outputpacman $PACOPTS "$pacmanarg"
@@ -486,7 +487,6 @@ if [[ $option = update ]]; then
 
   # Now for the installation part
   if [[ $newpackages ]]; then
-    sourcemakepkgconf
     echo "resolving dependencies..."
     localpackages=()
     localaurdeps=()
