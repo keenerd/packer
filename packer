@@ -70,7 +70,8 @@ getignoredpackages() {
   IFS=','
   ignoredpackages=($ignorearg)
   IFS=$'\n'" "
-  ignoredpackages+=( $(grep '^IgnorePkg' "$pacmanconf" | cut -d '=' -f 2) )
+  ignoredpackages+=( $(grep '^ *IgnorePkg' "$pacmanconf" | cut -d '=' -f 2) )
+  echo "$ignoredpackages"
 }
 
 # Checks to see if $1 is an ignored package
