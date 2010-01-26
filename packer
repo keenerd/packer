@@ -2,7 +2,9 @@
 # Copyright Matthew Bruenig <matthewbruenig@gmail.com>
 # Licensed under GPL version 3
 
+# set tmpfile stuff, clean tmpdir
 tmpdir="${TMPDIR:-/tmp}/packertmp-$UID"
+rm -rf "$tmpdir" &>/dev/null
 mkdir -p "$tmpdir"
 tmpfile="$tmpdir/tmpfile"
 
@@ -232,7 +234,7 @@ aurversionisnewer() {
 
 # Installs packages from aur ($1 is package, $2 is dependency or explicit)
 aurinstall() {
-  dir="/tmp/packer-$UID/$1"
+  dir="/tmp/packerbuild-$UID/$1"
 
   # Prepare the installation directory
   # If there is an old directory and aurversion is not newer, use old directory
