@@ -363,12 +363,12 @@ installhandling() {
  
   # If only pacman packages, then call pacman
   if [[ $pacmanpackages && -z $aurtargets ]]; then
-    runasroot $outputpacman $PACOPTS -S -- "${pacmanpackages[@]}"
+    runasroot $outputpacman "${PACOPTS[@]}" -S -- "${pacmanpackages[@]}"
     exit
   elif [[ $aurtargets ]]; then
     # First install the explicit pacman packages, let pacman prompt
     if [[ $pacmanpackages ]]; then
-        runasroot $outputpacman $PACOPTS -S -- "${pacmanpackages[@]}"
+        runasroot $outputpacman "${PACOPTS[@]}" -S -- "${pacmanpackages[@]}"
     fi
 
     # Test if aurpackages are already installed; echo warning if so
@@ -443,8 +443,8 @@ while [[ $1 ]]; do
     '-Su'|'-Suy'|'-Syu'|'-Syyu'|'-Suyy'|'Syuy') option=update ; pacmanarg="$1" ;;
     '-G') option=download ;;
     '-h'|'--help') usage ;;
-    '--ignore') ignorearg="$2" ; PACOPTS="$PACOPTS --ignore $2" ; shift ;;
-    '--noconfirm') noconfirm='1' PACOPTS="$PACOPTS --noconfirm";;
+    '--ignore') ignorearg="$2" ; PACOPTS+=("--ignore" "$2") ; shift ;;
+    '--noconfirm') noconfirm='1' PACOPTS+=("--noconfirm");;
     '--auronly') auronly='1' ;;
     '--devel') devel='1' ;;
     '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
@@ -471,7 +471,7 @@ if [[ $option = update ]]; then
   sourcemakepkgconf
   # Pacman update
   if ! [[ $auronly ]]; then
-    runasroot $outputpacman $PACOPTS "$pacmanarg"
+    runasroot $outputpacman "${PACOPTS[@]}" "$pacmanarg"
   fi
 
   # Aur update
