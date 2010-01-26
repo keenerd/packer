@@ -320,10 +320,9 @@ installhandling() {
     # Determine whether package is in pacman repos
     if ! [[ $auronly ]] && existsinpacman "$package"; then
       pacmanpackages+=("$package")
-    elif existsinpacmangroup "$package"; then
+    elif ! [[ $auronly ]] && existsinpacmangroup "$package"; then
       pacmanpackages+=("$package")
     else
-      # find dependencies
       if finddeps "$package"; then
         aurpackages+=("$package")
         aurdepends+=("${aurdeps[@]}")
@@ -522,7 +521,10 @@ if [[ $option = update ]]; then
   done
 
   # Now for the installation part
-  [[ $newpackages ]] && installhandling "${newpackages[@]}"
+  if [[ $newpackages ]]; then
+    auronly='1'
+    installhandling "${newpackages[@]}"
+  fi
   echo " local database is up to date"
 fi
 
