@@ -175,12 +175,38 @@ aurbar() {
 
   # Print output
   printf "$beginline %${spaces}s$1  $2 ${beginbar}" ""
-  for ((n=1; n<$hashes; n++)); do
-    printf "#"
-  done
-  for ((n=1; n<$dashes; n++)); do
-    printf "-"
-  done
+
+  # ILoveCandy
+  if [[ $bartype = candy ]]; then
+    # special progress bar (cf. callback.c in the pacman source code)
+    for ((n=1; n<$hashes; n++)); do
+      if (( (n==($hashes-1)) && ($dashes!=0) )); then
+        if (($n%2==0)); then
+          printf "\e[1;33mc\e[0m"
+        else
+          printf "\e[1;33mC\e[0m"
+        fi
+      else
+        printf "-"
+      fi
+    done
+    for ((n=1; n<$dashes; n++)); do
+      N=$(( $n+$hashes ))
+      (($hashes>0)) && N=$(($N-1))
+      if (($N%3==0)); then
+        printf "o"
+      else
+        printf " "
+      fi
+    done
+  else
+    for ((n=1; n<$hashes; n++)); do
+      printf "#"
+    done
+    for ((n=1; n<$dashes; n++)); do
+      printf "-"
+    done
+  fi
   echo -n "${endbar}${perc}%"
 }
 
@@ -447,9 +473,11 @@ if [[ $option = update ]]; then
   newpackages=()
   checkignores=()
   total="${#packages[@]}"
+  grep -q '^ *ILoveCandy' "$pacmanconf" && bartype='candy' || bartype='normal'
+
   if [[ $devel ]]; then
     for ((i=0; i<$total; i++)); do 
-      aurbar "$((i+1))" "$total"
+      aurbar "$((i+1))" "$total" "$bartype"
       if isignored "${packages[i]%% *}"; then
         checkignores+=("${packages[i]}")
       else
@@ -466,7 +494,7 @@ if [[ $option = update ]]; then
     done
   else
     for ((i=0; i<$total; i++)); do 
-      aurbar "$((i+1))" "$total"
+      aurbar "$((i+1))" "$total" "$bartype"
       if isignored "${packages[i]%% *}"; then
         checkignores+=("${packages[i]}")
       elif aurversionisnewer "${packages[i]%% *}" "${packages[i]##* }"; then
