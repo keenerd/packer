@@ -6,7 +6,6 @@
 tmpdir="${TMPDIR:-/tmp}/packertmp-$UID"
 rm -rf "$tmpdir" &>/dev/null
 mkdir -p "$tmpdir"
-tmpfile="$tmpdir/tmpfile"
 
 makepkgconf='/etc/makepkg.conf'
 pacmanconf='/etc/pacman.conf'
@@ -495,9 +494,9 @@ if [[ $option = update ]]; then
         checkignores+=("${packages[i]}")
       else
         unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
-        wget -q "http://aur.archlinux.org/packages/${packages[i]%% *}/${packages[i]%% *}/PKGBUILD" -O "$tmpfile"
+        wget -q "http://aur.archlinux.org/packages/${packages[i]%% *}/${packages[i]%% *}/PKGBUILD" -O "$tmpdir/${packages[i]%% *}.PKGBUILD"
         [[ $? -eq 0 ]] || continue
-        . "$tmpfile"
+        . "$tmpdir/${packages[i]%% *}"
         if [[ "$(vercmp "$pkgver" "${packages[i]##* }")" -gt 0 ]]; then
           newpackages+=("${packages[i]%% *}")
         elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
@@ -651,9 +650,9 @@ if [[ $option = info ]]; then
       $outputpacman -Si -- "$package"
       exit
     else # Check to see if it is in the aur
-      wget -q "http://aur.archlinux.org/packages/$package/$package/PKGBUILD" -O "$tmpfile"
+      wget -q "http://aur.archlinux.org/packages/$package/$package/PKGBUILD" -O "$tmpdir/$package.PKGBUILD"
       [[ $? -eq 0 ]] || err "No result found."
-      . "$tmpfile"
+      . "$tmpdir/$package.PKGBUILD"
 
       # Echo out the -Si formatted package information
       # Retrieve each element in order and echo them immediately
