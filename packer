@@ -496,7 +496,7 @@ if [[ $option = update ]]; then
         unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
         wget -q "http://aur.archlinux.org/packages/${packages[i]%% *}/${packages[i]%% *}/PKGBUILD" -O "$tmpdir/${packages[i]%% *}.PKGBUILD"
         [[ $? -eq 0 ]] || continue
-        . "$tmpdir/${packages[i]%% *}"
+        . "$tmpdir/${packages[i]%% *}.PKGBUILD"
         if [[ "$(vercmp "$pkgver" "${packages[i]##* }")" -gt 0 ]]; then
           newpackages+=("${packages[i]%% *}")
         elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
