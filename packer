@@ -2,7 +2,7 @@
 # Copyright Matthew Bruenig <matthewbruenig@gmail.com>
 # Licensed under GPL version 3
 
-tmpfile="${TMPDIR:-/tmp/packeroutput-$UID}"
+tmpfile="/tmp/packeroutput-$UID"
 makepkgconf='/etc/makepkg.conf'
 pacmanconf='/etc/pacman.conf'
 pacman="$(type -p pacman)"
