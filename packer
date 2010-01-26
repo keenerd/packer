@@ -177,7 +177,7 @@ aurbar() {
   printf "$beginline %${spaces}s$1  $2 ${beginbar}" ""
 
   # ILoveCandy
-  if [[ $bartype = candy ]]; then
+  if [[ $3 = candy ]]; then
     # special progress bar (cf. callback.c in the pacman source code)
     for ((n=1; n<$hashes; n++)); do
       if (( (n==($hashes-1)) && ($dashes!=0) )); then
