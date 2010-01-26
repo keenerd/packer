@@ -225,7 +225,7 @@ aurinstall() {
       echo
       case "$answer" in
         'Y'|'y'|'')
-          ${EDITOR:-vi} PKGBUILD
+          eval ${EDITOR:-vi} PKGBUILD
           ;;
       esac
     fi
@@ -243,7 +243,7 @@ aurinstall() {
       echo
       case "$answer" in
         'Y'|'y'|'')
-          ${EDITOR:-vi} "$install"
+          eval ${EDITOR:-vi} "$install"
           ;;
       esac 
     fi
