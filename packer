@@ -522,64 +522,8 @@ if [[ $option = update ]]; then
   done
 
   # Now for the installation part
-  if [[ $newpackages ]]; then
-    echo "resolving dependencies..."
-    localpackages=()
-    localaurdeps=()
-    localpacmandeps=()
-    for package in "${newpackages[@]}"; do
-      if finddeps "$package"; then
-        localpackages+=("$package")
-        localaurdeps+=("${aurdeps[@]}")
-        localpacmandeps+=("${pacmandeps[@]}")
-      else
-        echo "Not updating \`$package'."
-      fi 
-    done
-    [[ $localpackages ]] || exit
-
-    echo
-    if [[ $localaurdeps ]]; then
-      num="$((${#localaurdeps[@]}+${#localpackages[@]}))"
-      echo -e "${COLOR6}Aur Targets    ($num):${ENDCOLOR} ${localaurdeps[@]} ${localpackages[@]}"
-    else 
-      num="$((${#localpackages[@]}))"
-      echo -e "${COLOR6}Aur Targets    ($num):${ENDCOLOR} ${localpackages[@]}"
-    fi
-    [[ $localpacmandeps ]] && echo -e "${COLOR6}Pacman Targets ($((${#pacmandeps[@]}))):${ENDCOLOR} ${pacmandeps[@]}"
-
-    # Prompt on whether to proceed
-    echo -en "\nProceed with installation? [Y/n] "
-    if ! [[ $noconfirm ]]; then
-      proceed || exit
-    else
-      echo
-    fi
-
-    # Install Pacman Dependencies
-    if [[ $localpacmandeps ]]; then
-      runasroot  $outputpacman --noconfirm --asdeps -S -- "${localpacmandeps[@]}" || err "Installation failed."
-    fi
-
-    # Install aur dependencies
-    if [[ $localaurdeps ]]; then
-      for dep in "${localaurdeps[@]}"; do
-        aurinstall "$dep" "dependency"
-      done
-    fi
-
-    # Install updated packages
-    for package in "${localpackages[@]}"; do
-      scrapeaurdeps "$package"
-      if $pacman -T "${dependencies[@]}" &>/dev/null; then
-        aurinstall "$package" "explicit"
-      else
-        echo "Dependencies for \`$package' are not met, not building..."
-      fi
-    done
-  else
-    echo " local database is up to date"
-  fi
+  [[ $newpackages ]] && installhandling "${newpackages[@]}"
+  echo " local database is up to date"
 fi
 
 # Download (-G) handling
