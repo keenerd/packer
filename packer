@@ -222,10 +222,12 @@ aurbar() {
 
 # Checks if package is newer on aur ($1 is package name, $2 is local version)
 aurversionisnewer() {
-  wget -q "http://aur.archlinux.org/rpc.php?type=info&arg=$1" -O "$tmpfile"
+  if ! [[ -f "$tmpdir/$1.info" ]]; then
+    wget -q "http://aur.archlinux.org/rpc.php?type=info&arg=$1" -O "$tmpdir/$1.info"
+  fi
   unset aurversion
-  if ! grep -Fq ':"No result found"' "$tmpfile"; then
-    aurversion="$(cut -d '"' -f 18 "$tmpfile")"
+  if ! grep -Fq ':"No result found"' "$tmpdir/$1.info"; then
+    aurversion="$(cut -d '"' -f 18 "$tmpdir/$1.info")"
     if [[ "$(vercmp "$aurversion" "$2")" -gt 0  ]]; then
       return 0
     else
