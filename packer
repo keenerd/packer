@@ -516,7 +516,7 @@ if [[ $option = update ]]; then
       if isignored "$pkg"; then
         checkignores+=("${packages[i]}")
       elif aurversionisnewer "$pkg" "$ver"; then
-        newpackages+=("$ver")
+        newpackages+=("$pkg")
     fi
     done
   fi
