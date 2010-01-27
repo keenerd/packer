@@ -490,27 +490,33 @@ if [[ $option = update ]]; then
   if [[ $devel ]]; then
     for ((i=0; i<$total; i++)); do 
       aurbar "$((i+1))" "$total" "$bartype"
-      if isignored "${packages[i]%% *}"; then
+      pkg="${packages[i]%% *}"
+      ver="${packages[i]##* }"
+      if isignored "$pkg"; then
         checkignores+=("${packages[i]}")
       else
-        unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
-        wget -q "http://aur.archlinux.org/packages/${packages[i]%% *}/${packages[i]%% *}/PKGBUILD" -O "$tmpdir/${packages[i]%% *}.PKGBUILD"
-        [[ $? -eq 0 ]] || continue
-        . "$tmpdir/${packages[i]%% *}.PKGBUILD"
-        if [[ "$(vercmp "$pkgver" "${packages[i]##* }")" -gt 0 ]]; then
-          newpackages+=("${packages[i]%% *}")
-        elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
-          newpackages+=("${packages[i]%% *}")
+        if existsinaur "$pkg"; then
+          unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
+          wget -q "http://aur.archlinux.org/packages/$pkg/$pkg/PKGBUILD" -O "$tmpdir/$pkg.PKGBUILD"
+          [[ $? -eq 0 ]] || continue
+          . "$tmpdir/$pkg.PKGBUILD"
+          if [[ "$(vercmp "$pkgver" "$ver")" -gt 0 ]]; then
+            newpackages+=("$pkg")
+          elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
+            newpackages+=("$pkg")
+          fi
         fi
       fi
     done
   else
     for ((i=0; i<$total; i++)); do 
       aurbar "$((i+1))" "$total" "$bartype"
-      if isignored "${packages[i]%% *}"; then
+      pkg="${packages[i]%% *}"
+      ver="${packages[i]##* }"
+      if isignored "$pkg"; then
         checkignores+=("${packages[i]}")
-      elif aurversionisnewer "${packages[i]%% *}" "${packages[i]##* }"; then
-        newpackages+=("${packages[i]%% *}")
+      elif aurversionisnewer "$pkg" "$ver"; then
+        newpackages+=("$ver")
     fi
     done
   fi
