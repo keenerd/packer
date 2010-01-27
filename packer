@@ -237,6 +237,13 @@ aurversionisnewer() {
   fi
 }
 
+isoutofdate() {
+  if ! [[ -f "$tmpdir/$1.info" ]]; then
+    wget -q "http://aur.archlinux.org/rpc.php?type=info&arg=$1" -O "$tmpdir/$1.info"
+  fi
+  grep -qF '"OutOfDate":"1"}}' "$tmpdir/$1.info"
+}
+
 # Installs packages from aur ($1 is package, $2 is dependency or explicit)
 aurinstall() {
   dir="/tmp/packerbuild-$UID/$1"
@@ -336,7 +343,6 @@ installhandling() {
     fi
   done
 
-
   # Check if any aur target packages are ignored
   aurtargets=()
   for package in "${aurpackages[@]}"; do
@@ -385,6 +391,13 @@ installhandling() {
       fi
     done
 
+    # Echo warning if packages are out of date
+    for pkg in "${aurtargets[@]}" "${aurdepends[@]}"; do
+      if isoutofdate "$pkg"; then
+        echo -e "${COLOR6}warning:$ENDCOLOR $pkg is flagged out of date"
+      fi
+    done
+      
     # Prompt for aur packages and their dependencies
     echo
     if [[ $aurdepends ]]; then
