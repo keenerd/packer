@@ -322,10 +322,6 @@ installhandling() {
   getignoredpackages
   sourcemakepkgconf
   # Figure out all of the packages that need to be installed
-  pacmapackages=()
-  aurpackages=()
-  aurdepends=()
-  pacmandepends=()
   for package in "${packageargs[@]}"; do
     # Determine whether package is in pacman repos
     if ! [[ $auronly ]] && existsinpacman "$package"; then
@@ -344,7 +340,6 @@ installhandling() {
   done
 
   # Check if any aur target packages are ignored
-  aurtargets=()
   for package in "${aurpackages[@]}"; do
     if isignored "$package"; then
       echo -ne "${COLOR5}:: ${COLOR1}$package is in IgnorePkg/IgnoreGroup. Install anyway?${ENDCOLOR} [Y/n] "
@@ -378,7 +373,7 @@ installhandling() {
   elif [[ $aurtargets ]]; then
     # First install the explicit pacman packages, let pacman prompt
     if [[ $pacmanpackages ]]; then
-        runasroot $outputpacman "${PACOPTS[@]}" -S -- "${pacmanpackages[@]}"
+      runasroot $outputpacman "${PACOPTS[@]}" -S -- "${pacmanpackages[@]}"
     fi
 
     # Test if aurpackages are already installed; echo warning if so
@@ -554,7 +549,6 @@ fi
 
 # Download (-G) handling
 if [[ $option = download ]]; then
-  pkglist=()
   for package in "${packageargs[@]}"; do
     if existsinaur "$package"; then
       pkglist+=("$package")
