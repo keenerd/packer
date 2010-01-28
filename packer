@@ -229,7 +229,7 @@ aurversionisnewer() {
   unset aurversion
   if ! grep -Fq ':"No result found"' "$tmpdir/$1.info"; then
     aurversion="$(cut -d '"' -f 18 "$tmpdir/$1.info")"
-    if [[ "$(vercmp "$aurversion" "$2")" -gt 0  ]]; then
+    if [[ "$(LC_ALL=C vercmp "$aurversion" "$2")" -gt 0  ]]; then
       return 0
     else
       return 1
@@ -510,7 +510,7 @@ if [[ $option = update ]]; then
           wget -q "http://aur.archlinux.org/packages/$pkg/$pkg/PKGBUILD" -O "$tmpdir/$pkg.PKGBUILD"
           [[ $? -eq 0 ]] || continue
           . "$tmpdir/$pkg.PKGBUILD"
-          if [[ "$(vercmp "$pkgver" "$ver")" -gt 0 ]]; then
+          if [[ "$(LC_ALL=C vercmp "$pkgver" "$ver")" -gt 0 ]]; then
             newpackages+=("$pkg")
           elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
             newpackages+=("$pkg")
