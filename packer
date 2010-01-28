@@ -70,7 +70,7 @@ runasroot() {
 # Source makepkg.conf file
 sourcemakepkgconf() {
   . "$makepkgconf"
-  . "$usermakepkgconf"
+  [[ -r "$usermakepkgconf" ]] && . "$usermakepkgconf"
 }
 
 # Parse IgnorePkg and --ignore, put in globally accessible ignoredpackages array
