@@ -250,7 +250,7 @@ aurinstall() {
 
   # Prepare the installation directory
   # If there is an old directory and aurversion is not newer, use old directory
-  if . "$dir/$1/PKGBUILD" &>/dev/null && ! aurversionisnewer "$1" "$pkgver"; then
+  if . "$dir/$1/PKGBUILD" &>/dev/null && ! aurversionisnewer "$1" "$pkgver-$pkgrel"; then
     cd "$dir/$1"
   else
     [[ -d $dir ]] && rm -rf $dir
