@@ -574,7 +574,7 @@ if [[ $option = search || $option = searchinstall ]]; then
       $pacman -Ss -- "${packageargs[@]}" > "$tmpdir/pacman.search"
       IFS=$'\n' ; repoline=(  $(grep -Fv '    ' "$tmpdir/pacman.search") )
       repo=( "${repoline[@]%%/*}" )
-      version=( "${repoline[@]##* }" )
+      version=( "${repoline[@]#* }" )
       pacname=( "${repoline[@]##*/}" )
       pacname=( "${pacname[@]%% *}" )
       IFS=$'\a' ; description=( $(sed 's/^[^ ].*/\a/' "$tmpdir/pacman.search") )  
