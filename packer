@@ -8,6 +8,7 @@ rm -rf "$tmpdir" &>/dev/null
 mkdir -p "$tmpdir"
 
 makepkgconf='/etc/makepkg.conf'
+usermakepkgconf="$HOME/.makepkg.conf"
 pacmanconf='/etc/pacman.conf'
 
 pacman="$(type -p pacman)"
@@ -69,6 +70,7 @@ runasroot() {
 # Source makepkg.conf file
 sourcemakepkgconf() {
   . "$makepkgconf"
+  . "$usermakepkgconf"
 }
 
 # Parse IgnorePkg and --ignore, put in globally accessible ignoredpackages array
