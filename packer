@@ -20,6 +20,7 @@ if [[ $outputpacman ]]; then
   COLOR4='\e[1;36m'
   COLOR5='\e[1;34m'
   COLOR6='\e[1;33m'
+  COLOR7='\e[1;31m'
   ENDCOLOR='\e[0m'
 else
   outputpacman="$pacman"
@@ -669,7 +670,7 @@ if [[ $option = info ]]; then
       exit
     else # Check to see if it is in the aur
       wget -q "http://aur.archlinux.org/packages/$package/$package/PKGBUILD" -O "$tmpdir/$package.PKGBUILD"
-      [[ $? -eq 0 ]] || err "No result found."
+      [[ $? -eq 0 ]] || err "${COLOR7}error:${ENDCOLOR} package '$package' was not found"
       . "$tmpdir/$package.PKGBUILD"
 
       # Echo out the -Si formatted package information
