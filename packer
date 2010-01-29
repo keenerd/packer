@@ -584,7 +584,7 @@ if [[ $option = search || $option = searchinstall ]]; then
       for ((i=0; i<$pactotal; i++)); do
         echo -ne "$i ${COLOR3}${repo[$i]}/${COLOR1}${pacname[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}${description[$((i+1))]}"
       done
-      echo
+      [[ $pacname ]] && echo
     fi
   else
     pactotal=0
@@ -628,6 +628,9 @@ if [[ $option = search || $option = searchinstall ]]; then
   if [[ $option = searchinstall ]]; then
     pkglist=()
     allpackages=( "${pacname[@]}" "${aurname[@]}" )
+
+    # Exit if there are no matches
+    [[ $allpackages ]] || exit
 
     # Prompt for numbers
     echo
