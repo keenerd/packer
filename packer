@@ -100,6 +100,12 @@ existsinpacman() {
   $pacman -Si -- "$1" &>/dev/null
 }
 
+# Tests whether $1 is provided in pacman, sets globally accessibly providepkg var
+providedinpacman() {
+  IFS=$'\n'
+  providepkg=( $($pacman -Ssq -- "^$1$") )
+}
+
 # Tests whether $1 exists in a pacman group
 existsinpacmangroup() {
   [[ $($pacman -Sgq "$1") ]]
@@ -127,12 +133,14 @@ finddeps() {
   pacmandeps=()
   aurdeps=()
   scrapeaurdeps "$1" 
-  missingdeps=( $(pacman -T "${dependencies[@]}") )
+  missingdeps=( $($pacman -T "${dependencies[@]}") )
   for dep in "${missingdeps[@]}"; do
     if existsinpacman "$dep"; then
       pacmandeps+=("$dep")
     elif existsinaur "$dep"; then
       aurdeps+=("$dep")
+    elif providedinpacman "$dep"; then
+      pacmandeps+=("$providepkg")
     else
       [[ $option = "install" ]] &&  err "Dependency \`$dep' of \`$1' does not exist."
       echo "Dependency \`$dep' of \`$1' does not exist."
@@ -683,6 +691,7 @@ if [[ $option = info ]]; then
       echo -e "${COLOR1}Groups         : ${ENDCOLOR}${groups[@]:-None}"
       echo -e "${COLOR1}Provides       : ${ENDCOLOR}${provides[@]:-None}"
       echo -e "${COLOR1}Depends On     : ${ENDCOLOR}${depends[@]}"
+      echo -e "${COLOR1}Make Depends   : ${ENDCOLOR}${makedepends[@]}"
       echo -e -n "${COLOR1}Optional Deps  : ${ENDCOLOR}"
 
       len="${#optdepends[@]}"
