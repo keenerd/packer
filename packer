@@ -112,7 +112,7 @@ existsinlocal() {
 
 # Scrapes the aur deps from PKGBUILDS and puts in globally available dependencies array
 scrapeaurdeps() {
-  if ! [[ -f "$tmpdir.$1.PKGBUILD" ]]; then
+  if ! [[ -f "$tmpdir/$1.PKGBUILD" ]]; then
     wget -q "http://aur.archlinux.org/packages/$1/$1/PKGBUILD" -O "$tmpdir/$1.PKGBUILD"
   fi
   . "$tmpdir/$1.PKGBUILD"
