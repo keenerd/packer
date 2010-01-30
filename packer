@@ -568,7 +568,7 @@ if [[ $option = download ]]; then
   done
 
   for package in "${pkglist[@]}"; do
-    wget "http://aur.archlinux.org/packages/$package/$package.tar.gz"
+    wget "http://aur.archlinux.org/packages/$package/$package.tar.gz" -O "$package.tar.gz"
     tar xf "$package.tar.gz" 
   done
 fi
