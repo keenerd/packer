@@ -42,7 +42,7 @@ usage() {
   echo
   echo '    -S          - installs package'
   echo '    -Syu|-Su    - updates all packages'
-  echo '    -Ss         - searches for package'
+  echo '    -Ss|-Ssq    - searches for package'
   echo '    -Si         - outputs info for package'
   echo '    -G          - download and extract aur tarball only'
   echo
@@ -462,6 +462,7 @@ while [[ $1 ]]; do
   case "$1" in
     '-S') option=install ;;
     '-Ss') option=search ;;
+    '-Ssq'|'-Sqs') option=search ; quiet='1' ;;
     '-Si') option=info ;;
     '-Su'|'-Suy'|'-Syu'|'-Syyu'|'-Suyy'|'Syuy') option=update ; pacmanarg="$1" ;;
     '-G') option=download ;;
