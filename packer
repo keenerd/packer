@@ -275,7 +275,7 @@ aurinstall() {
   # Allow user to edit PKGBUILD
   if [[ -f PKGBUILD ]]; then
     if ! [[ $noconfirm ]]; then
-      echo -n "Edit $1 PKGBUILD with \$EDITOR? [Y/n] "
+      echo -en "${COLOR6}Edit $1 PKGBUILD with \$EDITOR? [Y/n]${ENDCOLOR} "
       read -n 1 answer
       echo
       case "$answer" in
@@ -293,7 +293,7 @@ aurinstall() {
   . PKGBUILD
   if [[ $install ]]; then
     if ! [[ $noconfirm ]]; then
-      echo -n "Edit $install with \$EDITOR? [Y/n] "
+      echo -en "${COLOR6}Edit $install with \$EDITOR? [Y/n]${ENDCOLOR} "
       read -n 1 answer
       echo
       case "$answer" in
