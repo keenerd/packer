@@ -413,7 +413,11 @@ installhandling() {
     else 
       echo -e "${COLOR6}Aur Targets    ($((${#aurtargets[@]}))):${ENDCOLOR} ${aurtargets[@]}"
     fi
-    [[ $pacmandepends ]] && echo -e "${COLOR6}Pacman Targets (${#pacmandepends[@]}):${ENDCOLOR} ${pacmandepends[@]}"
+    if [[ $pacmandepends ]]; then
+      IFS=$'\n'
+      pacmandepends=( $(printf "%s\n" "${pacmandepends[@]}" | sort -u) )
+      echo -e "${COLOR6}Pacman Targets (${#pacmandepends[@]}):${ENDCOLOR} ${pacmandepends[@]}"
+    fi
 
     # Prompt to proceed
     echo -en "\nProceed with installation? [Y/n] "
