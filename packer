@@ -572,7 +572,7 @@ if [[ $option = download ]]; then
     if existsinaur "$package"; then
       pkglist+=("$package")
     else
-      echo "Package \`$package' does not exist on aur."
+      err "Package \`$package' does not exist on aur."
     fi
   done
 
