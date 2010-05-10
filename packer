@@ -89,10 +89,15 @@ isignored() {
   [[ " ${ignoredpackages[@]} " =~ " $1 " ]]
 }
 
+# Encodes urls properly
+urlencode() {
+sed 's/%/%25/g;s/ /%20/g;s/ /%09/g;s/!/%21/g;s/"/%22/g;s/#/%23/g;s/\$/%24/g;s/\&/%26/g;s/'\''/%27/g;s/(/%28/g;s/)/%29/g;s/\*/%2a/g;s/+/%2b/g;s/,/%2c/g;s/-/%2d/g;s/\./%2e/g;s/\//%2f/g;s/:/%3a/g;s/;/%3b/g;s//%3e/g;s/?/%3f/g;s/@/%40/g;s/\[/%5b/g;s/\\/%5c/g;s/\]/%5d/g;s/\^/%5e/g;s/_/%5f/g;s/`/%60/g;s/{/%7b/g;s/|/%7c/g;s/}/%7d/g;s/~/%7e/g' <<<"$1"
+}
+
 # Tests whether $1 exists on the aur
 existsinaur() {
   if ! [[ -f "$tmpdir/$1.info" ]]; then
-    wget -q "http://aur.archlinux.org/rpc.php?type=info&arg=$1" -O "$tmpdir/$1.info"
+    wget -q "http://aur.archlinux.org/rpc.php?type=info&arg=$(urlencode "$1")" -O "$tmpdir/$1.info"
   fi
   ! grep -Fq ':"No result found"' "$tmpdir/$1.info"
 }
@@ -234,7 +239,7 @@ aurbar() {
 # Checks if package is newer on aur ($1 is package name, $2 is local version)
 aurversionisnewer() {
   if ! [[ -f "$tmpdir/$1.info" ]]; then
-    wget -q "http://aur.archlinux.org/rpc.php?type=info&arg=$1" -O "$tmpdir/$1.info"
+    wget -q "http://aur.archlinux.org/rpc.php?type=info&arg=$(urlencode "$1")" -O "$tmpdir/$1.info"
   fi
   unset aurversion
   if ! grep -Fq ':"No result found"' "$tmpdir/$1.info"; then
@@ -251,7 +256,7 @@ aurversionisnewer() {
 
 isoutofdate() {
   if ! [[ -f "$tmpdir/$1.info" ]]; then
-    wget -q "http://aur.archlinux.org/rpc.php?type=info&arg=$1" -O "$tmpdir/$1.info"
+    wget -q "http://aur.archlinux.org/rpc.php?type=info&arg=$(urlencode "$1")" -O "$tmpdir/$1.info"
   fi
   grep -qF '"OutOfDate":"1"}}' "$tmpdir/$1.info"
 }
@@ -621,10 +626,10 @@ if [[ $option = search || $option = searchinstall ]]; then
   # Aur searching and tmpfile preparation
   if  [[ ${#packageargs[@]} -eq 1 ]]; then
     # Fill up the arrays with package information from dump file
-    wget -q "http://aur.archlinux.org/rpc.php?type=search&arg=$packageargs" -O- | sed -e 's/","/"\n"/g' -e 's/\\//g' > "$tmpdir/$packageargs.search" 
+    wget -q "http://aur.archlinux.org/rpc.php?type=search&arg=$(urlencode "$packageargs")" -O- | sed -e 's/","/"\n"/g' -e 's/\\//g' > "$tmpdir/$packageargs.search" 
     parsefile="$tmpdir/$packageargs.search"
   else
-    wget -q "http://aur.archlinux.org/rpc.php?type=search&arg=$packageargs" -O- | sed -e 's/{/\n{/g' -e 's/\\//g' > "$tmpdir/$packageargs.search-0"
+    wget -q "http://aur.archlinux.org/rpc.php?type=search&arg=$(urlencode "$packageargs")" -O- | sed -e 's/{/\n{/g' -e 's/\\//g' > "$tmpdir/$packageargs.search-0"
     for ((i=1 ; i<${#packageargs[@]} ; i++)); do
       grep -e "\"Name\":\".*${packageargs[$i]}.*\",\"Version" -e "\"Description\":\".*${packageargs[$i]}.*\",\"LocationID" "${tmpdir}/$packageargs.search-$((i-1))" > "$tmpdir/$packageargs.search-$i"
     done
