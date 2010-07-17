@@ -645,6 +645,16 @@ if [[ $option = search || $option = searchinstall ]]; then
     description=( $(grep -F '"Description":"' "$parsefile" | sed -e 's/^"Description":"//' -e 's/"$/ /') )
   fi
   aurtotal="${#aurname[@]}"
+  aurall_sorted=(
+    $(for ((i=0;i<$aurtotal;i++)); do
+      echo "${aurname[$i]};${version[$i]};${description[$i]}"
+    done | sort )
+  )
+  aurname=( 
+    $(for entry in ${aurname[@]}; do
+      echo "$entry"
+    done | sort)
+  )
 
   # Echo out the -Ss formatted package information
   if [[ $option = search ]]; then
@@ -654,7 +664,9 @@ if [[ $option = search || $option = searchinstall ]]; then
       done
     else
       for ((i=0 ; i<$aurtotal ; i++)); do
-        echo -e "${COLOR3}aur/${COLOR1}${aurname[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}\n    ${description[$i]}"
+        while IFS=';' read -ra ENTRY; do 
+          echo -e "${COLOR3}aur/${COLOR1}${ENTRY[0]} ${COLOR2}${ENTRY[1]}${ENDCOLOR}\n    ${ENTRY[2]}"
+        done <<< "${aurall_sorted[$i]}"
       done
     fi
   else
@@ -667,7 +679,9 @@ if [[ $option = search || $option = searchinstall ]]; then
     else
       for ((i=$pactotal ; i<$alltotal ; i++)); do
         elem="$(($i-$pactotal))"
-        echo -e "$i ${COLOR3}aur/${COLOR1}${aurname[$elem]} ${COLOR2}${version[$elem]}${ENDCOLOR}\n    ${description[$elem]}"
+        while IFS=';' read -ra ENTRY; do 
+          echo -e "$i ${COLOR3}aur/${COLOR1}${ENTRY[0]} ${COLOR2}${ENTRY[1]}${ENDCOLOR}\n    ${ENTRY[2]}"
+        done <<< "${aurall_sorted[$elem]}"
       done
     fi
   fi
