@@ -244,7 +244,6 @@ aurversionisnewer() {
   unset aurversion
   if ! grep -Fq ':"No result found"' "$tmpdir/$1.info"; then
     aurversion="$(cut -d '"' -f 18 "$tmpdir/$1.info")"
-	echo $aurversion
     if [[ "$(LC_ALL=C vercmp "$aurversion" "$2")" -gt 0  ]] || [[ "$aurversion" == *LATEST* ]]; then
       return 0
     else
