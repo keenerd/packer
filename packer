@@ -14,7 +14,6 @@ pacmanconf='/etc/pacman.conf'
 pacman="$(type -p pacman)"
 outputpacman="$(type -p pacman-color)"
 if [[ $outputpacman && ! $COLOR = "NO" ]]; then
-  echo foo
   COLOR1='\e[1;39m'
   COLOR2='\e[1;32m'
   COLOR3='\e[1;35m'
@@ -24,7 +23,6 @@ if [[ $outputpacman && ! $COLOR = "NO" ]]; then
   COLOR7='\e[1;31m'
   ENDCOLOR='\e[0m'
 else
-  echo bar
   outputpacman="$pacman"
 fi
 
