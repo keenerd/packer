@@ -263,7 +263,7 @@ isoutofdate() {
 
 # Installs packages from aur ($1 is package, $2 is dependency or explicit)
 aurinstall() {
-  dir="/tmp/packerbuild-$UID/$1"
+  dir="${TMPDIR:-/tmp}/packerbuild-$UID/$1"
 
   # Prepare the installation directory
   # If there is an old directory and aurversion is not newer, use old directory
