@@ -196,7 +196,7 @@ aurbar() {
   width="${width##* }"
   charsbefore="$((${#beginline}+${#1}+${#2}+${#beginbar}+3))"
   spaces="$((52-$charsbefore))"
-  barchars="$(($width-52-${#perc}-3))"
+  barchars="$(($width-52-7))"
   hashes="$(($barchars*$perc/100))" 
   dashes="$(($barchars-$hashes))"
 
@@ -226,14 +226,14 @@ aurbar() {
       fi
     done
   else
-    for ((n=1; n<$hashes; n++)); do
+    for ((n=0; n<$hashes; n++)); do
       printf "#"
     done
-    for ((n=1; n<$dashes; n++)); do
+    for ((n=0; n<$dashes; n++)); do
       printf "-"
     done
   fi
-  echo -n "${endbar}${perc}%"
+  printf "%s%3s%%\r" ${endbar} ${perc}
 }
 
 # Checks if package is newer on aur ($1 is package name, $2 is local version)
