@@ -268,7 +268,7 @@ aurinstall() {
     [[ -d $dir ]] && rm -rf $dir
     mkdir -p "$dir"
     cd "$dir"
-    curl -fq "http://aur.archlinux.org/packages/$1/$1.tar.gz" > "$1.tar.gz"
+    curl -fs "http://aur.archlinux.org/packages/$1/$1.tar.gz" > "$1.tar.gz"
     tar xf "$1.tar.gz"
     cd "$1"
   fi
