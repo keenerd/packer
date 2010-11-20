@@ -195,8 +195,8 @@ aurbar() {
   width="$(stty size)"
   width="${width##* }"
   charsbefore="$((${#beginline}+${#1}+${#2}+${#beginbar}+3))"
-  spaces="$((52-$charsbefore))"
-  barchars="$(($width-52-7))"
+  spaces="$((51-$charsbefore))"
+  barchars="$(($width-51-7))"
   hashes="$(($barchars*$perc/100))" 
   dashes="$(($barchars-$hashes))"
 
