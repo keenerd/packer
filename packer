@@ -526,14 +526,24 @@ if [[ $option = update ]]; then
     for ((i=0; i<$total; i++)); do 
       aurbar "$((i+1))" "$total" "$bartype"
       pkg="${packages[i]%% *}"
-      ver="${packages[i]##* }"
       if isignored "$pkg"; then
         checkignores+=("${packages[i]}")
         continue
       fi
-      curl -fs "$PKGURL/$pkg/$pkg/PKGBUILD" > "$tmpdir/$pkg.PKGBUILD"
+      curl -fs "$PKGURL/$pkg/$pkg/PKGBUILD" > "$tmpdir/$pkg.PKGBUILD" &
+      while (( $(jobs | wc -l) >= 8 )); do
+        sleep 0.1
+        jobs > /dev/null
+      done
+    done
+    for ((i=0; i<$total; i++)); do 
+      pkg="${packages[i]%% *}"
+      ver="${packages[i]##* }"
       if [[ -f "$tmpdir/$pkg.PKGBUILD" ]] && [[ ! -s "$tmpdir/$pkg.PKGBUILD" ]]; then
         rm "$tmpdir/$pkg.PKGBUILD"
+        continue
+      fi
+      if isignored "$pkg"; then
         continue
       fi
       unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
