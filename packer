@@ -11,6 +11,9 @@ makepkgconf='/etc/makepkg.conf'
 usermakepkgconf="$HOME/.makepkg.conf"
 pacmanconf='/etc/pacman.conf'
 
+RPCURL="http://aur.archlinux.org/rpc.php?type"
+PKGURL="http://aur.archlinux.org/packages"
+
 pacman="$(type -p pacman)"
 outputpacman="$(type -p pacman-color)"
 if [[ $outputpacman && ! $COLOR = "NO" ]]; then
@@ -91,9 +94,7 @@ isignored() {
 
 # Tests whether $1 exists on the aur
 existsinaur() {
-  if ! [[ -f "$tmpdir/$1.info" ]]; then
-    curl -fGs --data-urlencode "arg=$1" "http://aur.archlinux.org/rpc.php?type=info" > "$tmpdir/$1.info"
-  fi
+  rpcinfo_bg "$1"
   ! grep -Fq ':"No result found"' "$tmpdir/$1.info"
 }
 
@@ -121,7 +122,7 @@ existsinlocal() {
 # Scrapes the aur deps from PKGBUILDS and puts in globally available dependencies array
 scrapeaurdeps() {
   if ! [[ -f "$tmpdir/$1.PKGBUILD" ]]; then
-    curl -fs "http://aur.archlinux.org/packages/$1/$1/PKGBUILD" > "$tmpdir/$1.PKGBUILD"
+    curl -fs "$PKGURL/$1/$1/PKGBUILD" > "$tmpdir/$1.PKGBUILD"
   fi
   . "$tmpdir/$1.PKGBUILD"
   IFS=$'\n'
@@ -231,11 +232,14 @@ aurbar() {
   printf "%s%3s%%\r" ${endbar} ${perc}
 }
 
-# Checks if package is newer on aur ($1 is package name, $2 is local version)
-aurversionisnewer() {
+# Download info in background
+rpcinfo_bg() {
   if ! [[ -f "$tmpdir/$1.info" ]]; then
-    curl -fGs --data-urlencode "arg=$1" "http://aur.archlinux.org/rpc.php?type=info" > "$tmpdir/$1.info"
+    curl -fGs --data-urlencode "arg=$1" "$RPCURL=info" > "$tmpdir/$1.info"
   fi
+}
+
+aurversionisnewer_bg() {
   unset aurversion
   if ! grep -Fq ':"No result found"' "$tmpdir/$1.info"; then
     aurversion="$(cut -d '"' -f 18 "$tmpdir/$1.info")"
@@ -249,9 +253,15 @@ aurversionisnewer() {
   fi
 }
 
+# Checks if package is newer on aur ($1 is package name, $2 is local version)
+aurversionisnewer() {
+  rpcinfo_bg "$1"
+  aurversionisnewer_bg "$1" "$2"
+}
+
 isoutofdate() {
   if ! [[ -f "$tmpdir/$1.info" ]]; then
-    curl -fGs --data-urlencode "arg=$1" "http://aur.archlinux.org/rpc.php?type=info" > "$tmpdir/$1.info"
+    curl -fGs --data-urlencode "arg=$1" "$RPCURL=info" > "$tmpdir/$1.info"
   fi
   grep -qF '"OutOfDate":"1"}}' "$tmpdir/$1.info"
 }
@@ -268,7 +278,7 @@ aurinstall() {
     [[ -d $dir ]] && rm -rf $dir
     mkdir -p "$dir"
     cd "$dir"
-    curl -fs "http://aur.archlinux.org/packages/$1/$1.tar.gz" > "$1.tar.gz"
+    curl -fs "$PKGURL/$1/$1.tar.gz" > "$1.tar.gz"
     tar xf "$1.tar.gz"
     cd "$1"
   fi
@@ -524,7 +534,7 @@ if [[ $option = update ]]; then
       else
         if existsinaur "$pkg"; then
           unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
-          curl -fs "http://aur.archlinux.org/packages/$pkg/$pkg/PKGBUILD" > "$tmpdir/$pkg.PKGBUILD"
+          curl -fs "$PKGURL/$pkg/$pkg/PKGBUILD" > "$tmpdir/$pkg.PKGBUILD"
           [[ $? -eq 0 ]] || continue
           . "$tmpdir/$pkg.PKGBUILD"
           if [[ "$(LC_ALL=C vercmp "$pkgver" "$ver")" -gt 0 ]]; then
@@ -539,10 +549,19 @@ if [[ $option = update ]]; then
     for ((i=0; i<$total; i++)); do 
       aurbar "$((i+1))" "$total" "$bartype"
       pkg="${packages[i]%% *}"
+      rpcinfo_bg "$pkg" &
+      while (( $(jobs | wc -l) >= 8 )); do
+        sleep 0.1
+        jobs > /dev/null
+      done
+    done
+    wait
+    for ((i=0; i<$total; i++)); do
+      pkg="${packages[i]%% *}"
       ver="${packages[i]##* }"
       if isignored "$pkg"; then
         checkignores+=("${packages[i]}")
-      elif aurversionisnewer "$pkg" "$ver"; then
+      elif aurversionisnewer_bg "$pkg" "$ver"; then
         newpackages+=("$pkg")
     fi
     done
@@ -577,7 +596,7 @@ if [[ $option = download ]]; then
   done
 
   for package in "${pkglist[@]}"; do
-    curl -fs "http://aur.archlinux.org/packages/$package/$package.tar.gz" > "$package.tar.gz"
+    curl -fs "$PKGURL/$package/$package.tar.gz" > "$package.tar.gz"
     tar xf "$package.tar.gz" 
   done
 fi
@@ -621,10 +640,10 @@ if [[ $option = search || $option = searchinstall ]]; then
   # Aur searching and tmpfile preparation
   if  [[ ${#packageargs[@]} -eq 1 ]]; then
     # Fill up the arrays with package information from dump file
-    curl -fGs --data-urlencode "arg=$packageargs" "http://aur.archlinux.org/rpc.php?type=search" | sed -e 's/","/"\n"/g' -e 's/\\//g' > "$tmpdir/$packageargs.search" 
+    curl -fGs --data-urlencode "arg=$packageargs" "$RPCURL=search" | sed -e 's/","/"\n"/g' -e 's/\\//g' > "$tmpdir/$packageargs.search" 
     parsefile="$tmpdir/$packageargs.search"
   else
-    curl -fGs --data-urlencode "arg=$packageargs" "http://aur.archlinux.org/rpc.php?type=search" | sed -e 's/{/\n{/g' -e 's/\\//g' > "$tmpdir/$packageargs.search-0"
+    curl -fGs --data-urlencode "arg=$packageargs" "$RPCURL=search" | sed -e 's/{/\n{/g' -e 's/\\//g' > "$tmpdir/$packageargs.search-0"
     for ((i=1 ; i<${#packageargs[@]} ; i++)); do
       grep -e "\"Name\":\".*${packageargs[$i]}.*\",\"Version" -e "\"Description\":\".*${packageargs[$i]}.*\",\"LocationID" "${tmpdir}/$packageargs.search-$((i-1))" > "$tmpdir/$packageargs.search-$i"
     done
@@ -711,7 +730,7 @@ if [[ $option = info ]]; then
       $outputpacman -Si -- "$package"
       exit
     else # Check to see if it is in the aur
-      curl -fs "http://aur.archlinux.org/packages/$package/$package/PKGBUILD" > "$tmpdir/$package.PKGBUILD"
+      curl -fs "$PKGURL/$package/$package/PKGBUILD" > "$tmpdir/$package.PKGBUILD"
       [[ $? -eq 0 ]] || err "${COLOR7}error:${ENDCOLOR} package '$package' was not found"
       . "$tmpdir/$package.PKGBUILD"
 
