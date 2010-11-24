@@ -532,6 +532,7 @@ if [[ $option = update ]]; then
       pkginfo "$pkg" &
       nap
     done
+    wait
     for ((i=0; i<$total; i++)); do 
       pkg="${packages[i]%% *}"
       ver="${packages[i]##* }"
