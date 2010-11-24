@@ -121,9 +121,7 @@ existsinlocal() {
 
 # Scrapes the aur deps from PKGBUILDS and puts in globally available dependencies array
 scrapeaurdeps() {
-  if ! [[ -f "$tmpdir/$1.PKGBUILD" ]]; then
-    curl -fs "$PKGURL/$1/$1/PKGBUILD" > "$tmpdir/$1.PKGBUILD"
-  fi
+  pkginfo_bg "$1"
   . "$tmpdir/$1.PKGBUILD"
   IFS=$'\n'
   dependencies=( $(echo -e "${depends[*]}\n${makedepends[*]}" | sed -e 's/=.*//' -e 's/>.*//' -e 's/<.*//'| sort -u) )
@@ -236,6 +234,12 @@ aurbar() {
 rpcinfo_bg() {
   if ! [[ -f "$tmpdir/$1.info" ]]; then
     curl -fGs --data-urlencode "arg=$1" "$RPCURL=info" > "$tmpdir/$1.info"
+  fi
+}
+
+pkginfo_bg() {
+  if ! [[ -f "$tmpdir/$1.PKGBUILD" ]]; then
+    curl -fs "$PKGURL/$1/$1/PKGBUILD" > "$tmpdir/$1.PKGBUILD"
   fi
 }
 
@@ -538,7 +542,7 @@ if [[ $option = update ]]; then
         checkignores+=("${packages[i]}")
         continue
       fi
-      curl -fs "$PKGURL/$pkg/$pkg/PKGBUILD" > "$tmpdir/$pkg.PKGBUILD" &
+      pkginfo_bg "$pkg" &
       nap
     done
     for ((i=0; i<$total; i++)); do 
@@ -741,8 +745,8 @@ if [[ $option = info ]]; then
       $outputpacman -Si -- "$package"
       exit
     else # Check to see if it is in the aur
-      curl -fs "$PKGURL/$package/$package/PKGBUILD" > "$tmpdir/$package.PKGBUILD"
-      [[ $? -eq 0 ]] || err "${COLOR7}error:${ENDCOLOR} package '$package' was not found"
+      pkginfo_bg "$package"
+      [[ -s "$tmpdir/$package.PKGBUILD" ]] || err "${COLOR7}error:${ENDCOLOR} package '$package' was not found"
       . "$tmpdir/$package.PKGBUILD"
 
       # Echo out the -Si formatted package information
