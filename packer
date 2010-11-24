@@ -133,47 +133,35 @@ finddeps() {
   # loop through dependencies, if not installed, determine if pacman or aur deps
   pacmandeps=()
   aurdeps=()
-  scrapeaurdeps "$1" 
+  scrapeaurdeps "$1"
   missingdeps=( $($pacman -T "${dependencies[@]}") )
-  for dep in "${missingdeps[@]}"; do
-    if existsinpacman "$dep"; then
-      pacmandeps+=("$dep")
-    elif existsinaur "$dep"; then
-      aurdeps+=("$dep")
-    elif providedinpacman "$dep"; then
-      pacmandeps+=("$providepkg")
-    else
-      [[ $option = "install" ]] &&  err "Dependency \`$dep' of \`$1' does not exist."
-      echo "Dependency \`$dep' of \`$1' does not exist."
-      return 1
-    fi
-  done
-
-  # Aur dependencies can also have aur dependencies, so find all of them
-  if [[ $aurdeps ]]; then
-    checkdeps=( "${aurdeps[@]}" )
-    while [[ $checkdeps ]]; do
-      tmpdeps=( "${checkdeps[@]}" )
-      checkdeps=()
-      for aurdep in "${tmpdeps[@]}"; do
-        scrapeaurdeps "$aurdep"
-        missingdeps=( $($pacman -T "${dependencies[@]}") )
-        for dep in "${missingdeps[@]}"; do
-          if ! [[ " $1 ${aurdeps[@]} ${pacmandeps[@]} " =~ " $dep " ]];  then
-            if existsinpacman "$dep"; then
-              pacmandeps+=("$dep")
-            elif existsinaur "$dep"; then
-              aurdeps=("$dep" "${aurdeps[@]}")
-              checkdeps+=("$dep")
-            else
-              echo "Dependency \`$dep' does not exist."
-              return 1
-            fi
-          fi
-        done
+  while [[ $missingdeps ]]; do
+    checkdeps=()
+    for dep in "${missingdeps[@]}"; do
+      if [[ " $1 ${aurdeps[@]} ${pacmandeps[@]} " =~ " $dep " ]];  then
+        continue
+      fi
+      if existsinpacman "$dep"; then
+        pacmandeps+=("$dep")
+      elif existsinaur "$dep"; then
+        aurdeps+=("$dep")
+        checkdeps+=("$dep")
+      elif providedinpacman "$dep"; then
+        pacmandeps+=("$providepkg")
+      else
+        [[ $option = "install" ]] &&  err "Dependency \`$dep' of \`$1' does not exist."
+        echo "Dependency \`$dep' of \`$1' does not exist."
+        return 1
+      fi
+    done
+    missingdeps=()
+    for dep in "${checkdeps[@]}"; do
+      scrapeaurdeps "$dep"
+      for depdep in "${dependencies[@]}"; do
+        [[ $(pacman -T "$depdep") ]] && missingdeps+=("$depdep")
       done
     done
-  fi
+  done
 }
 
 # Displays a progress bar ($1 is numerator, $2 is denominator, $3 is candy/normal)
@@ -329,6 +317,7 @@ aurinstall() {
 
 # Goes through all of the install tests and execution ($@ is packages to be installed)
 installhandling() {
+  date "+%S %N"
   packageargs=("$@")
   getignoredpackages
   sourcemakepkgconf
@@ -349,6 +338,7 @@ installhandling() {
       err "Package \`$package' does not exist."
     fi
   done
+  date "+%S %N"
 
   # Check if any aur target packages are ignored
   for package in "${aurpackages[@]}"; do
