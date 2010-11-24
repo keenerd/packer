@@ -531,16 +531,17 @@ if [[ $option = update ]]; then
         checkignores+=("${packages[i]}")
         continue
       fi
-      if existsinaur "$pkg"; then
-        unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
-        curl -fs "$PKGURL/$pkg/$pkg/PKGBUILD" > "$tmpdir/$pkg.PKGBUILD"
-        [[ $? -eq 0 ]] || continue
-        . "$tmpdir/$pkg.PKGBUILD"
-        if [[ "$(LC_ALL=C vercmp "$pkgver" "$ver")" -gt 0 ]]; then
-          newpackages+=("$pkg")
-        elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
-          newpackages+=("$pkg")
-        fi
+      curl -fs "$PKGURL/$pkg/$pkg/PKGBUILD" > "$tmpdir/$pkg.PKGBUILD"
+      if [[ -f "$tmpdir/$pkg.PKGBUILD" ]] && [[ ! -s "$tmpdir/$pkg.PKGBUILD" ]]; then
+        rm "$tmpdir/$pkg.PKGBUILD"
+        continue
+      fi
+      unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
+      . "$tmpdir/$pkg.PKGBUILD"
+      if [[ "$(LC_ALL=C vercmp "$pkgver" "$ver")" -gt 0 ]]; then
+        newpackages+=("$pkg")
+      elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
+        newpackages+=("$pkg")
       fi
     done
   else
