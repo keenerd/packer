@@ -260,9 +260,7 @@ aurversionisnewer() {
 }
 
 isoutofdate() {
-  if ! [[ -f "$tmpdir/$1.info" ]]; then
-    curl -fGs --data-urlencode "arg=$1" "$RPCURL=info" > "$tmpdir/$1.info"
-  fi
+  rpcinfo_bg "$1"
   grep -qF '"OutOfDate":"1"}}' "$tmpdir/$1.info"
 }
 
