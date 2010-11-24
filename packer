@@ -230,12 +230,9 @@ aurversionisnewer() {
     aurversion="$(cut -d '"' -f 18 "$tmpdir/$1.info")"
     if [[ "$(LC_ALL=C vercmp "$aurversion" "$2")" -gt 0  ]]; then
       return 0
-    else
-      return 1
     fi
-  else
-    return 1
   fi
+  return 1
 }
 
 isoutofdate() {
