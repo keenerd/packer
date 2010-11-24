@@ -222,7 +222,6 @@ aurbar() {
   printf "%s%3s%%\r" ${endbar} ${perc}
 }
 
-# Download info in background
 rpcinfo() {
   if ! [[ -f "$tmpdir/$1.info" ]]; then
     curl -fGs --data-urlencode "arg=$1" "$RPCURL=info" > "$tmpdir/$1.info"
@@ -536,8 +535,7 @@ if [[ $option = update ]]; then
     for ((i=0; i<$total; i++)); do 
       pkg="${packages[i]%% *}"
       ver="${packages[i]##* }"
-      if [[ -f "$tmpdir/$pkg.PKGBUILD" ]] && [[ ! -s "$tmpdir/$pkg.PKGBUILD" ]]; then
-        rm "$tmpdir/$pkg.PKGBUILD"
+      if [[ ! -s "$tmpdir/$pkg.PKGBUILD" ]]; then
         continue
       fi
       if isignored "$pkg"; then
