@@ -201,11 +201,7 @@ aurbar() {
   if [[ $3 = candy ]]; then
     for ((n=1; n<$hashes; n++)); do
       if (( (n==($hashes-1)) && ($dashes!=0) )); then
-        if (($n%2==0)); then
-          printf "\e[1;33mc\e[0m"
-        else
-          printf "\e[1;33mC\e[0m"
-        fi
+        (($n%2==0)) && printf "\e[1;33mc\e[0m" || printf "\e[1;33mC\e[0m"
       else
         printf "-"
       fi
@@ -213,11 +209,7 @@ aurbar() {
     for ((n=1; n<$dashes; n++)); do
       N=$(( $n+$hashes ))
       (($hashes>0)) && N=$(($N-1))
-      if (($N%3==0)); then
-        printf "o"
-      else
-        printf " "
-      fi
+      (($N%3==0)) && printf "o" || printf " "
     done
   else
     for ((n=0; n<$hashes; n++)); do
