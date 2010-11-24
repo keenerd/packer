@@ -94,7 +94,7 @@ isignored() {
 
 # Tests whether $1 exists on the aur
 existsinaur() {
-  rpcinfo_bg "$1"
+  rpcinfo "$1"
   ! grep -Fq ':"No result found"' "$tmpdir/$1.info"
 }
 
@@ -121,7 +121,7 @@ existsinlocal() {
 
 # Scrapes the aur deps from PKGBUILDS and puts in globally available dependencies array
 scrapeaurdeps() {
-  pkginfo_bg "$1"
+  pkginfo "$1"
   . "$tmpdir/$1.PKGBUILD"
   IFS=$'\n'
   dependencies=( $(echo -e "${depends[*]}\n${makedepends[*]}" | sed -e 's/=.*//' -e 's/>.*//' -e 's/<.*//'| sort -u) )
@@ -231,19 +231,21 @@ aurbar() {
 }
 
 # Download info in background
-rpcinfo_bg() {
+rpcinfo() {
   if ! [[ -f "$tmpdir/$1.info" ]]; then
     curl -fGs --data-urlencode "arg=$1" "$RPCURL=info" > "$tmpdir/$1.info"
   fi
 }
 
-pkginfo_bg() {
+pkginfo() {
   if ! [[ -f "$tmpdir/$1.PKGBUILD" ]]; then
     curl -fs "$PKGURL/$1/$1/PKGBUILD" > "$tmpdir/$1.PKGBUILD"
   fi
 }
 
-aurversionisnewer_bg() {
+# Checks if package is newer on aur ($1 is package name, $2 is local version)
+aurversionisnewer() {
+  rpcinfo "$1"
   unset aurversion
   if ! grep -Fq ':"No result found"' "$tmpdir/$1.info"; then
     aurversion="$(cut -d '"' -f 18 "$tmpdir/$1.info")"
@@ -257,14 +259,8 @@ aurversionisnewer_bg() {
   fi
 }
 
-# Checks if package is newer on aur ($1 is package name, $2 is local version)
-aurversionisnewer() {
-  rpcinfo_bg "$1"
-  aurversionisnewer_bg "$1" "$2"
-}
-
 isoutofdate() {
-  rpcinfo_bg "$1"
+  rpcinfo "$1"
   grep -qF '"OutOfDate":"1"}}' "$tmpdir/$1.info"
 }
 
@@ -542,7 +538,7 @@ if [[ $option = update ]]; then
         checkignores+=("${packages[i]}")
         continue
       fi
-      pkginfo_bg "$pkg" &
+      pkginfo "$pkg" &
       nap
     done
     for ((i=0; i<$total; i++)); do 
@@ -567,7 +563,7 @@ if [[ $option = update ]]; then
     for ((i=0; i<$total; i++)); do 
       aurbar "$((i+1))" "$total" "$bartype"
       pkg="${packages[i]%% *}"
-      rpcinfo_bg "$pkg" &
+      rpcinfo "$pkg" &
       nap
     done
     wait
@@ -576,7 +572,7 @@ if [[ $option = update ]]; then
       ver="${packages[i]##* }"
       if isignored "$pkg"; then
         checkignores+=("${packages[i]}")
-      elif aurversionisnewer_bg "$pkg" "$ver"; then
+      elif aurversionisnewer "$pkg" "$ver"; then
         newpackages+=("$pkg")
     fi
     done
@@ -745,7 +741,7 @@ if [[ $option = info ]]; then
       $outputpacman -Si -- "$package"
       exit
     else # Check to see if it is in the aur
-      pkginfo_bg "$package"
+      pkginfo "$package"
       [[ -s "$tmpdir/$package.PKGBUILD" ]] || err "${COLOR7}error:${ENDCOLOR} package '$package' was not found"
       . "$tmpdir/$package.PKGBUILD"
 
