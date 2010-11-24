@@ -468,6 +468,14 @@ proceed() {
   esac
 }
 
+# process busy loop
+nap() {
+  while (( $(jobs | wc -l) >= 8 )); do
+    sleep 0.1
+    jobs > /dev/null
+  done
+}
+
 # Argument parsing
 [[ $1 ]] || usage
 packageargs=()
@@ -531,10 +539,7 @@ if [[ $option = update ]]; then
         continue
       fi
       curl -fs "$PKGURL/$pkg/$pkg/PKGBUILD" > "$tmpdir/$pkg.PKGBUILD" &
-      while (( $(jobs | wc -l) >= 8 )); do
-        sleep 0.1
-        jobs > /dev/null
-      done
+      nap
     done
     for ((i=0; i<$total; i++)); do 
       pkg="${packages[i]%% *}"
@@ -559,10 +564,7 @@ if [[ $option = update ]]; then
       aurbar "$((i+1))" "$total" "$bartype"
       pkg="${packages[i]%% *}"
       rpcinfo_bg "$pkg" &
-      while (( $(jobs | wc -l) >= 8 )); do
-        sleep 0.1
-        jobs > /dev/null
-      done
+      nap
     done
     wait
     for ((i=0; i<$total; i++)); do
