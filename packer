@@ -314,7 +314,6 @@ aurinstall() {
 
 # Goes through all of the install tests and execution ($@ is packages to be installed)
 installhandling() {
-  date "+%S %N"
   packageargs=("$@")
   getignoredpackages
   sourcemakepkgconf
@@ -335,7 +334,6 @@ installhandling() {
       err "Package \`$package' does not exist."
     fi
   done
-  date "+%S %N"
 
   # Check if any aur target packages are ignored
   for package in "${aurpackages[@]}"; do
