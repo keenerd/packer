@@ -11,9 +11,12 @@ makepkgconf='/etc/makepkg.conf'
 usermakepkgconf="$HOME/.makepkg.conf"
 pacmanconf='/etc/pacman.conf'
 
+RPCURL="http://aur.archlinux.org/rpc.php?type"
+PKGURL="http://aur.archlinux.org/packages"
+
 pacman="$(type -p pacman)"
 outputpacman="$(type -p pacman-color)"
-if [[ $outputpacman ]]; then
+if [[ $outputpacman && ! $COLOR = "NO" ]]; then
   COLOR1='\e[1;39m'
   COLOR2='\e[1;32m'
   COLOR3='\e[1;35m'
@@ -89,16 +92,9 @@ isignored() {
   [[ " ${ignoredpackages[@]} " =~ " $1 " ]]
 }
 
-# Encodes urls properly
-urlencode() {
-sed 's/%/%25/g;s/ /%20/g;s/ /%09/g;s/!/%21/g;s/"/%22/g;s/#/%23/g;s/\$/%24/g;s/\&/%26/g;s/'\''/%27/g;s/(/%28/g;s/)/%29/g;s/\*/%2a/g;s/+/%2b/g;s/,/%2c/g;s/-/%2d/g;s/\./%2e/g;s/\//%2f/g;s/:/%3a/g;s/;/%3b/g;s//%3e/g;s/?/%3f/g;s/@/%40/g;s/\[/%5b/g;s/\\/%5c/g;s/\]/%5d/g;s/\^/%5e/g;s/_/%5f/g;s/`/%60/g;s/{/%7b/g;s/|/%7c/g;s/}/%7d/g;s/~/%7e/g' <<<"$1"
-}
-
 # Tests whether $1 exists on the aur
 existsinaur() {
-  if ! [[ -f "$tmpdir/$1.info" ]]; then
-    wget -q "http://aur.archlinux.org/rpc.php?type=info&arg=$(urlencode "$1")" -O "$tmpdir/$1.info"
-  fi
+  rpcinfo "$1"
   ! grep -Fq ':"No result found"' "$tmpdir/$1.info"
 }
 
@@ -125,9 +121,7 @@ existsinlocal() {
 
 # Scrapes the aur deps from PKGBUILDS and puts in globally available dependencies array
 scrapeaurdeps() {
-  if ! [[ -f "$tmpdir/$1.PKGBUILD" ]]; then
-    wget -q "http://aur.archlinux.org/packages/$1/$1/PKGBUILD" -O "$tmpdir/$1.PKGBUILD"
-  fi
+  pkginfo "$1"
   . "$tmpdir/$1.PKGBUILD"
   IFS=$'\n'
   dependencies=( $(echo -e "${depends[*]}\n${makedepends[*]}" | sed -e 's/=.*//' -e 's/>.*//' -e 's/<.*//'| sort -u) )
@@ -139,47 +133,35 @@ finddeps() {
   # loop through dependencies, if not installed, determine if pacman or aur deps
   pacmandeps=()
   aurdeps=()
-  scrapeaurdeps "$1" 
+  scrapeaurdeps "$1"
   missingdeps=( $($pacman -T "${dependencies[@]}") )
-  for dep in "${missingdeps[@]}"; do
-    if existsinpacman "$dep"; then
-      pacmandeps+=("$dep")
-    elif existsinaur "$dep"; then
-      aurdeps+=("$dep")
-    elif providedinpacman "$dep"; then
-      pacmandeps+=("$providepkg")
-    else
-      [[ $option = "install" ]] &&  err "Dependency \`$dep' of \`$1' does not exist."
-      echo "Dependency \`$dep' of \`$1' does not exist."
-      return 1
-    fi
-  done
-
-  # Aur dependencies can also have aur dependencies, so find all of them
-  if [[ $aurdeps ]]; then
-    checkdeps=( "${aurdeps[@]}" )
-    while [[ $checkdeps ]]; do
-      tmpdeps=( "${checkdeps[@]}" )
-      checkdeps=()
-      for aurdep in "${tmpdeps[@]}"; do
-        scrapeaurdeps "$aurdep"
-        missingdeps=( $($pacman -T "${dependencies[@]}") )
-        for dep in "${missingdeps[@]}"; do
-          if ! [[ " $1 ${aurdeps[@]} ${pacmandeps[@]} " =~ " $dep " ]];  then
-            if existsinpacman "$dep"; then
-              pacmandeps+=("$dep")
-            elif existsinaur "$dep"; then
-              aurdeps=("$dep" "${aurdeps[@]}")
-              checkdeps+=("$dep")
-            else
-              echo "Dependency \`$dep' does not exist."
-              return 1
-            fi
-          fi
-        done
+  while [[ $missingdeps ]]; do
+    checkdeps=()
+    for dep in "${missingdeps[@]}"; do
+      if [[ " $1 ${aurdeps[@]} ${pacmandeps[@]} " =~ " $dep " ]];  then
+        continue
+      fi
+      if existsinpacman "$dep"; then
+        pacmandeps+=("$dep")
+      elif existsinaur "$dep"; then
+        aurdeps+=("$dep")
+        checkdeps+=("$dep")
+      elif providedinpacman "$dep"; then
+        pacmandeps+=("$providepkg")
+      else
+        [[ $option = "install" ]] &&  err "Dependency \`$dep' of \`$1' does not exist."
+        echo "Dependency \`$dep' of \`$1' does not exist."
+        return 1
+      fi
+    done
+    missingdeps=()
+    for dep in "${checkdeps[@]}"; do
+      scrapeaurdeps "$dep"
+      for depdep in "${dependencies[@]}"; do
+        [[ $(pacman -T "$depdep") ]] && missingdeps+=("$depdep")
       done
     done
-  fi
+  done
 }
 
 # Displays a progress bar ($1 is numerator, $2 is denominator, $3 is candy/normal)
@@ -195,8 +177,8 @@ aurbar() {
   width="$(stty size)"
   width="${width##* }"
   charsbefore="$((${#beginline}+${#1}+${#2}+${#beginbar}+3))"
-  spaces="$((52-$charsbefore))"
-  barchars="$(($width-52-${#perc}-3))"
+  spaces="$((51-$charsbefore))"
+  barchars="$(($width-51-7))"
   hashes="$(($barchars*$perc/100))" 
   dashes="$(($barchars-$hashes))"
 
@@ -207,11 +189,7 @@ aurbar() {
   if [[ $3 = candy ]]; then
     for ((n=1; n<$hashes; n++)); do
       if (( (n==($hashes-1)) && ($dashes!=0) )); then
-        if (($n%2==0)); then
-          printf "\e[1;33mc\e[0m"
-        else
-          printf "\e[1;33mC\e[0m"
-        fi
+        (($n%2==0)) && printf "\e[1;33mc\e[0m" || printf "\e[1;33mC\e[0m"
       else
         printf "-"
       fi
@@ -219,51 +197,52 @@ aurbar() {
     for ((n=1; n<$dashes; n++)); do
       N=$(( $n+$hashes ))
       (($hashes>0)) && N=$(($N-1))
-      if (($N%3==0)); then
-        printf "o"
-      else
-        printf " "
-      fi
+      (($N%3==0)) && printf "o" || printf " "
     done
   else
-    for ((n=1; n<$hashes; n++)); do
+    for ((n=0; n<$hashes; n++)); do
       printf "#"
     done
-    for ((n=1; n<$dashes; n++)); do
+    for ((n=0; n<$dashes; n++)); do
       printf "-"
     done
   fi
-  echo -n "${endbar}${perc}%"
+  printf "%s%3s%%\r" ${endbar} ${perc}
+}
+
+rpcinfo() {
+  if ! [[ -f "$tmpdir/$1.info" ]]; then
+    curl -fGs --data-urlencode "arg=$1" "$RPCURL=info" > "$tmpdir/$1.info"
+  fi
+}
+
+pkginfo() {
+  if ! [[ -f "$tmpdir/$1.PKGBUILD" ]]; then
+    curl -fs "$PKGURL/$1/$1/PKGBUILD" > "$tmpdir/$1.PKGBUILD"
+  fi
 }
 
 # Checks if package is newer on aur ($1 is package name, $2 is local version)
 aurversionisnewer() {
-  if ! [[ -f "$tmpdir/$1.info" ]]; then
-    wget -q "http://aur.archlinux.org/rpc.php?type=info&arg=$(urlencode "$1")" -O "$tmpdir/$1.info"
-  fi
+  rpcinfo "$1"
   unset aurversion
   if ! grep -Fq ':"No result found"' "$tmpdir/$1.info"; then
     aurversion="$(cut -d '"' -f 18 "$tmpdir/$1.info")"
     if [[ "$(LC_ALL=C vercmp "$aurversion" "$2")" -gt 0  ]] || [[ "$aurversion" == *LATEST* ]]; then
       return 0
-    else
-      return 1
     fi
-  else
-    return 1
   fi
+  return 1
 }
 
 isoutofdate() {
-  if ! [[ -f "$tmpdir/$1.info" ]]; then
-    wget -q "http://aur.archlinux.org/rpc.php?type=info&arg=$(urlencode "$1")" -O "$tmpdir/$1.info"
-  fi
+  rpcinfo "$1"
   grep -qF '"OutOfDate":"1"}}' "$tmpdir/$1.info"
 }
 
 # Installs packages from aur ($1 is package, $2 is dependency or explicit)
 aurinstall() {
-  dir="/tmp/packerbuild-$UID/$1"
+  dir="${TMPDIR:-/tmp}/packerbuild-$UID/$1"
 
   # Prepare the installation directory
   # If there is an old directory and aurversion is not newer, use old directory
@@ -273,7 +252,7 @@ aurinstall() {
     [[ -d $dir ]] && rm -rf $dir
     mkdir -p "$dir"
     cd "$dir"
-    wget "http://aur.archlinux.org/packages/$1/$1.tar.gz"
+    curl -fs "$PKGURL/$1/$1.tar.gz" > "$1.tar.gz"
     tar xf "$1.tar.gz"
     cd "$1"
   fi
@@ -335,6 +314,7 @@ aurinstall() {
 
 # Goes through all of the install tests and execution ($@ is packages to be installed)
 installhandling() {
+  date "+%S %N"
   packageargs=("$@")
   getignoredpackages
   sourcemakepkgconf
@@ -355,6 +335,7 @@ installhandling() {
       err "Package \`$package' does not exist."
     fi
   done
+  date "+%S %N"
 
   # Check if any aur target packages are ignored
   for package in "${aurpackages[@]}"; do
@@ -465,6 +446,14 @@ proceed() {
   esac
 }
 
+# process busy loop
+nap() {
+  while (( $(jobs | wc -l) >= 8 )); do
+    sleep 0.1
+    jobs > /dev/null
+  done
+}
+
 # Argument parsing
 [[ $1 ]] || usage
 packageargs=()
@@ -523,26 +512,40 @@ if [[ $option = update ]]; then
     for ((i=0; i<$total; i++)); do 
       aurbar "$((i+1))" "$total" "$bartype"
       pkg="${packages[i]%% *}"
-      ver="${packages[i]##* }"
       if isignored "$pkg"; then
         checkignores+=("${packages[i]}")
-      else
-        if existsinaur "$pkg"; then
-          unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
-          wget -q "http://aur.archlinux.org/packages/$pkg/$pkg/PKGBUILD" -O "$tmpdir/$pkg.PKGBUILD"
-          [[ $? -eq 0 ]] || continue
-          . "$tmpdir/$pkg.PKGBUILD"
-          if [[ "$(LC_ALL=C vercmp "$pkgver" "$ver")" -gt 0 ]]; then
-            newpackages+=("$pkg")
-          elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
-            newpackages+=("$pkg")
-          fi
-        fi
+        continue
+      fi
+      pkginfo "$pkg" &
+      nap
+    done
+    wait
+    for ((i=0; i<$total; i++)); do 
+      pkg="${packages[i]%% *}"
+      ver="${packages[i]##* }"
+      if [[ ! -s "$tmpdir/$pkg.PKGBUILD" ]]; then
+        continue
+      fi
+      if isignored "$pkg"; then
+        continue
+      fi
+      unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
+      . "$tmpdir/$pkg.PKGBUILD"
+      if [[ "$(LC_ALL=C vercmp "$pkgver" "$ver")" -gt 0 ]]; then
+        newpackages+=("$pkg")
+      elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
+        newpackages+=("$pkg")
       fi
     done
   else
     for ((i=0; i<$total; i++)); do 
       aurbar "$((i+1))" "$total" "$bartype"
+      pkg="${packages[i]%% *}"
+      rpcinfo "$pkg" &
+      nap
+    done
+    wait
+    for ((i=0; i<$total; i++)); do
       pkg="${packages[i]%% *}"
       ver="${packages[i]##* }"
       if isignored "$pkg"; then
@@ -582,7 +585,7 @@ if [[ $option = download ]]; then
   done
 
   for package in "${pkglist[@]}"; do
-    wget "http://aur.archlinux.org/packages/$package/$package.tar.gz" -O "$package.tar.gz"
+    curl -fs "$PKGURL/$package/$package.tar.gz" > "$package.tar.gz"
     tar xf "$package.tar.gz" 
   done
 fi
@@ -626,10 +629,10 @@ if [[ $option = search || $option = searchinstall ]]; then
   # Aur searching and tmpfile preparation
   if  [[ ${#packageargs[@]} -eq 1 ]]; then
     # Fill up the arrays with package information from dump file
-    wget -q "http://aur.archlinux.org/rpc.php?type=search&arg=$(urlencode "$packageargs")" -O- | sed -e 's/","/"\n"/g' -e 's/\\//g' > "$tmpdir/$packageargs.search" 
+    curl -fGs --data-urlencode "arg=$packageargs" "$RPCURL=search" | sed -e 's/","/"\n"/g' -e 's/\\//g' > "$tmpdir/$packageargs.search" 
     parsefile="$tmpdir/$packageargs.search"
   else
-    wget -q "http://aur.archlinux.org/rpc.php?type=search&arg=$(urlencode "$packageargs")" -O- | sed -e 's/{/\n{/g' -e 's/\\//g' > "$tmpdir/$packageargs.search-0"
+    curl -fGs --data-urlencode "arg=$packageargs" "$RPCURL=search" | sed -e 's/{/\n{/g' -e 's/\\//g' > "$tmpdir/$packageargs.search-0"
     for ((i=1 ; i<${#packageargs[@]} ; i++)); do
       grep -e "\"Name\":\".*${packageargs[$i]}.*\",\"Version" -e "\"Description\":\".*${packageargs[$i]}.*\",\"LocationID" "${tmpdir}/$packageargs.search-$((i-1))" > "$tmpdir/$packageargs.search-$i"
     done
@@ -730,8 +733,8 @@ if [[ $option = info ]]; then
       $outputpacman -Si -- "$package"
       exit
     else # Check to see if it is in the aur
-      wget -q "http://aur.archlinux.org/packages/$package/$package/PKGBUILD" -O "$tmpdir/$package.PKGBUILD"
-      [[ $? -eq 0 ]] || err "${COLOR7}error:${ENDCOLOR} package '$package' was not found"
+      pkginfo "$package"
+      [[ -s "$tmpdir/$package.PKGBUILD" ]] || err "${COLOR7}error:${ENDCOLOR} package '$package' was not found"
       . "$tmpdir/$package.PKGBUILD"
 
       # Echo out the -Si formatted package information
