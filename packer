@@ -47,6 +47,7 @@ usage() {
   echo '    -Syu|-Su     - updates all packages'
   echo '    -Ss|-Ssq     - searches for package'
   echo '    -Si          - outputs info for package'
+  echo '    -Sc|-Scc     - clean up package files and tmpdir'
   echo '    -G           - download and extract aur tarball only'
   echo
   echo '    --quiet      - only output package name for searches'
@@ -464,6 +465,7 @@ while [[ $1 ]]; do
     '-Ssq'|'-Sqs') option=search ; quiet='1' ;;
     '-Si') option=info ;;
     '-Su'|'-Suy'|'-Syu'|'-Syyu'|'-Suyy'|'Syuy') option=update ; pacmanarg="$1" ;;
+	'-Sc'|'-Scc') option=clean ; pacmanarg="$1" ;;
     '-G') option=download ;;
     '-h'|'--help') usage ;;
     '--quiet') quiet='1' ;;
@@ -484,7 +486,12 @@ done
 
 # Sanity checks
 [[ $option ]] || option="searchinstall"
-[[ $option != "update" && -z $packageargs ]] && err "Must specify a package."
+if [[ -z $packageargs ]]; then
+	case "$option" in
+		'update'|'clean') ;;
+		*) err "Must specify a package."
+	esac
+fi
 
 # Install (-S) handling
 if [[ $option = install ]]; then
@@ -758,4 +765,19 @@ if [[ $option = info ]]; then
       echo
     fi
   done
+fi
+
+# Clean (-Sc) handling
+if [[ $option = clean ]]; then
+	runasroot $outputpacman "${PACOPTS[@]}" "$pacmanarg"
+
+	echo
+	echo "packer's tmpdir: $tmpdir"
+	echo -n "Do you want to remove packer's tmpdir? [y/N]"
+	read answer
+	case $answer in
+		'Y'|'y')
+			echo 'removing tmpdir...'
+			rm -fr "$tmpdir"
+	esac
 fi
