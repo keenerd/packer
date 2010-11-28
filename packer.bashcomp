@@ -1,0 +1,31 @@
+#!/bin/bash
+
+_packer()
+{
+	local cur=`_get_cword`
+	local prev="${COMP_WORDS[COMP_CWORD-1]}"
+	local first="${COMP_WORDS[1]}"
+
+	local actions="-S -Syu -Su -Ss -Ssq -Si -G"
+	
+	local options="--quiet --ignore --noconfirm --asexplicit --asdeps --noedit --auronly --devel --skipinteg -h --help"
+	
+	if [ $COMP_CWORD == 1 ]; then
+		COMPREPLY=($(compgen -W "$actions" -- "$cur"))
+	else
+		if [[ "$cur" == -* ]]; then
+			COMPREPLY=($(compgen -W "$options" -- "$cur"))
+		else
+			case "$first" in
+				-G|-Su|-Syu)
+					COMPREPLY=()
+					;;
+				-*)
+					COMPREPLY=($(compgen -W "$(pacman -Slq)" -- "$cur"))
+					;;
+			esac
+		fi
+	fi
+}
+
+complete -o default -F _packer packer
