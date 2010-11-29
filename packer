@@ -771,13 +771,27 @@ fi
 if [[ $option = clean ]]; then
 	runasroot $outputpacman "${PACOPTS[@]}" "$pacmanarg"
 
+	builddir="${TMPDIR:-/tmp}/packerbuild-$UID"
+	if [[ "$pacmanarg" == "-Scc" ]]; then
+		rmbuilddir=" and packerbuild"
+	fi
+
 	echo
-	echo "packer's tmpdir: $tmpdir"
-	echo -n "Do you want to remove packer's tmpdir? [y/N]"
+	echo -n "packertmp: '$tmpdir'"
+	if [[ "$rmbuilddir" != "" ]]; then
+		echo ", packerbuild: '$builddir'"
+	else
+		echo
+	fi
+	echo -n "Do you want to remove packertmp$rmbuilddir? [y/N] "
 	read answer
-	case $answer in
+	case "$answer" in
 		'Y'|'y')
-			echo 'removing tmpdir...'
+			echo "removing packertmp$rmbuilddir..."
 			rm -fr "$tmpdir"
+
+			if [[ "$rmbuilddir" != "" ]]; then
+				rm -fr "$builddir"
+			fi
 	esac
 fi
