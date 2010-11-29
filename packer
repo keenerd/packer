@@ -11,7 +11,7 @@ makepkgconf='/etc/makepkg.conf'
 usermakepkgconf="$HOME/.makepkg.conf"
 pacmanconf='/etc/pacman.conf'
 
-dbpath="$(cat $pacmanconf | sed -n '/^\s*[^#]*\s*DBPath\s*=\s*\([a-zA-Z0-9\s/\\]\+\)/{s//\1/;p;};')"
+dbpath="$(cat $pacmanconf | sed -n '/^\s*DBPath\s*=\s*\([a-zA-Z0-9\s/\\]\+\)/{s//\1/;p;};')"
 [[ "$dbpath" == "" ]] && dbpath='/var/lib/pacman'
 
 RPCURL="http://aur.archlinux.org/rpc.php?type"
@@ -135,7 +135,7 @@ existsinpacmangroup() {
 # Tests whether $1 exists locally
 existsinlocal() {
   #$pacman -Qq -- "$1" &>/dev/null
-  [ -d "$(ls -1 "$dbpath/local" | sed -n "/^\($1-[a-zA-Z0-9.\s\\]\+-[0-9]\+\)/{s##$dbpath/local/\1#;p;};")" ] && return 0
+  [ -d "$(ls -1 "$dbpath/local" | sed -n "/^\($1-[a-zA-Z0-9.]\+-[0-9]\+\)/{s##$dbpath/local/\1#;p;};")" ] && return 0
   return 1
 }
 
