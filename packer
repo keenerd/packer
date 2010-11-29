@@ -11,7 +11,7 @@ makepkgconf='/etc/makepkg.conf'
 usermakepkgconf="$HOME/.makepkg.conf"
 pacmanconf='/etc/pacman.conf'
 
-dbpath="$(cat $pacmanconf | sed -n '/[^#]*DBPath\s*=\s*\([a-zA-Z0-9\s/]\+\)/{s//\1/;p;};')"
+dbpath="$(cat $pacmanconf | sed -n '/^\s*[^#]*\s*DBPath\s*=\s*\([a-zA-Z0-9\s/\\]\+\)/{s//\1/;p;};')"
 [[ "$dbpath" == "" ]] && dbpath='/var/lib/pacman'
 
 RPCURL="http://aur.archlinux.org/rpc.php?type"
