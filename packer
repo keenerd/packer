@@ -118,7 +118,6 @@ existsinaur() {
 
 # Tests whether $1 exists in pacman
 existsinpacman() {
-  #$pacman -Si -- "$1" &>/dev/null
   for dir in $(ls -1 "$dbpath/sync"); do
     [ -d "$(ls -1 "$dbpath/sync/$dir" | sed -n "/^\($1-[0-9._]\+-[0-9]\+\)/{s##$dbpath/sync/$dir/\1#;p;};")" ] && return 0
   done
@@ -139,7 +138,6 @@ existsinpacmangroup() {
 
 # Tests whether $1 exists locally
 existsinlocal() {
-  #$pacman -Qq -- "$1" &>/dev/null
   [ -d "$(ls -1 "$dbpath/local" | sed -n "/^\($1-[0-9._]\+-[0-9]\+\)/{s##$dbpath/local/\1#;p;};")" ] && return 0
   return 1
 }
@@ -682,8 +680,8 @@ if [[ $option = search || $option = searchinstall ]]; then
       done
     else
       for ((i=0 ; i<$aurtotal ; i++)); do
-		installed=''
-		existsinlocal "${aurname[i]}" && installed=" ${COLOR7}[installed]${ENDCOLOR}"
+        installed=''
+        existsinlocal "${aurname[i]}" && installed=" ${COLOR7}[installed]${ENDCOLOR}"
         echo -e "${COLOR3}aur/${COLOR1}${aurname[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}$installed\n    ${description[$i]}"
       done
     fi
