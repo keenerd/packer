@@ -43,20 +43,23 @@ err() {
 usage() {
   echo 'usage: packer [option] [package] [package] [...]'
   echo
-  echo '    -S          - installs package'
-  echo '    -Syu|-Su    - updates all packages'
-  echo '    -Ss|-Ssq    - searches for package'
-  echo '    -Si         - outputs info for package'
-  echo '    -G          - download and extract aur tarball only'
+  echo '    -S           - installs package'
+  echo '    -Syu|-Su     - updates all packages'
+  echo '    -Ss|-Ssq     - searches for package'
+  echo '    -Si          - outputs info for package'
+  echo '    -Sc|-Scc     - clean up package files and tmpdir'
+  echo '    -G           - download and extract aur tarball only'
   echo
-  echo '    --quiet     - only output package name for searches'
-  echo '    --ignore    - takes a comma-separated list of packages to ignore'
-  echo '    --noconfirm - do not prompt for any confirmation'
-  echo '    --noedit    - do not prompt to edit files'
-  echo '    --auronly   - only do actions for aur'
-  echo '    --devel     - update devel packages during -Su'
-  echo '    --skipinteg - when using makepkg, do not check md5s'
-  echo '    -h          - outputs this message'
+  echo '    --quiet      - only output package name for searches'
+  echo '    --ignore     - takes a comma-separated list of packages to ignore'
+  echo '    --noconfirm  - do not prompt for any confirmation'
+  echo '    --asexplicit - install the packages explicitly'
+  echo '    --asdeps     - install the given packages as dependencies'
+  echo '    --noedit     - do not prompt to edit files'
+  echo '    --auronly    - only do actions for aur'
+  echo '    --devel      - update devel packages during -Su'
+  echo '    --skipinteg  - when using makepkg, do not check md5s'
+  echo '    -h           - outputs this message'
   exit
 }
 
@@ -261,7 +264,7 @@ aurinstall() {
   if [[ -f PKGBUILD ]]; then
     if ! [[ $noconfirm || $noedit ]]; then
       echo -en "${COLOR6}Edit $1 PKGBUILD with \$EDITOR? [Y/n]${ENDCOLOR} "
-      read -n 1 answer
+      read answer
       echo
       case "$answer" in
         'Y'|'y'|'')
@@ -279,7 +282,7 @@ aurinstall() {
   if [[ $install ]]; then
     if ! [[ $noconfirm || $noedit ]]; then
       echo -en "${COLOR6}Edit $install with \$EDITOR? [Y/n]${ENDCOLOR} "
-      read -n 1 answer
+      read answer
       echo
       case "$answer" in
         'Y'|'y'|'')
@@ -462,11 +465,14 @@ while [[ $1 ]]; do
     '-Ssq'|'-Sqs') option=search ; quiet='1' ;;
     '-Si') option=info ;;
     '-Su'|'-Suy'|'-Syu'|'-Syyu'|'-Suyy'|'Syuy') option=update ; pacmanarg="$1" ;;
+	'-Sc'|'-Scc') option=clean ; pacmanarg="$1" ;;
     '-G') option=download ;;
     '-h'|'--help') usage ;;
     '--quiet') quiet='1' ;;
     '--ignore') ignorearg="$2" ; PACOPTS+=("--ignore" "$2") ; shift ;;
     '--noconfirm') noconfirm='1' PACOPTS+=("--noconfirm");;
+	'--asexplicit') PACOPTS+=('--asexplicit');;
+	'--asdeps') PACOPTS+=('--asdeps');;
     '--noedit') noedit='1' ;;
     '--auronly') auronly='1' ;;
     '--devel') devel='1' ;;
@@ -480,7 +486,12 @@ done
 
 # Sanity checks
 [[ $option ]] || option="searchinstall"
-[[ $option != "update" && -z $packageargs ]] && err "Must specify a package."
+if [[ -z $packageargs ]]; then
+	case "$option" in
+		'update'|'clean') ;;
+		*) err "Must specify a package."
+	esac
+fi
 
 # Install (-S) handling
 if [[ $option = install ]]; then
@@ -768,4 +779,33 @@ if [[ $option = info ]]; then
       echo
     fi
   done
+fi
+
+# Clean (-Sc) handling
+if [[ $option = clean ]]; then
+	runasroot $outputpacman "${PACOPTS[@]}" "$pacmanarg"
+
+	builddir="${TMPDIR:-/tmp}/packerbuild-$UID"
+	if [[ "$pacmanarg" == "-Scc" ]]; then
+		rmbuilddir=" and packerbuild"
+	fi
+
+	echo
+	echo -n "packertmp: '$tmpdir'"
+	if [[ "$rmbuilddir" != "" ]]; then
+		echo ", packerbuild: '$builddir'"
+	else
+		echo
+	fi
+	echo -n "Do you want to remove packertmp$rmbuilddir? [y/N] "
+	read answer
+	case "$answer" in
+		'Y'|'y')
+			echo "removing packertmp$rmbuilddir..."
+			rm -fr "$tmpdir"
+
+			if [[ "$rmbuilddir" != "" ]]; then
+				rm -fr "$builddir"
+			fi
+	esac
 fi
