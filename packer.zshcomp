@@ -1,0 +1,50 @@
+#compdef packer
+
+_packer_opts_other=(
+	'-G[Download and extract aur tarball only]'
+	'-h[Display help]' 
+	'--help[Display help]'
+)
+
+_packer_opts_sync=(
+	'-S[Installs package]' 	
+	'-Syu[Updates all packages]' 
+	'-Su[Updates all packages]' 
+	'-Ss[Searches for package]' 
+	'-Ssq[Searches for package]'
+	'-Si[Outputs info for package]' 
+	'-Sc[Clean old packages]' 
+	'-Scc[Clean everything]' 
+)
+
+_packer_options=(
+	'--quiet[only output package name for searches]' 
+	'--ignore[takes a comma-separated list of packages to ignore]' 
+	'--noconfirm[do not prompt for any confirmation]' 
+	'--noedit[do not prompt to edit files]' 
+	'--auronly[only do actions for aur]' 
+	'--devel[update devel packages during -Su]' 
+	'--skipinteg[when using makepkg, do not check md5s]' 
+)
+
+
+_packer() {
+	case $words[2] in
+		-S*)
+			_arguments -s : \
+				"$_packer_opts_sync[@]" \
+			 	"$_packer_options[@]" \
+				;;
+		--)
+			_arguments -s : \
+			 	"$_packer_options[@]" \
+				;;
+		*)
+			_arguments -s : \
+				"$_packer_opts_sync[@]" \
+			 	"$_packer_opts_other[@]" \
+				;;
+	esac
+}
+
+_packer "$@"
