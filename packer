@@ -135,9 +135,7 @@ existsinpacmangroup() {
 # Tests whether $1 exists locally
 existsinlocal() {
   #$pacman -Qq -- "$1" &>/dev/null
-  ver='*-*'
-  [[ "$2" != "" ]] && ver="$2"
-  [ -d "$(echo "$dbpath"/local/$1-$ver)" ] && return 0
+  [ -d "$dbpath/local/$(ls -1 "$dbpath/local" | egrep "$1-[0-9.]+-[0-9]+")" ] && return 0
   return 1
 }
 
@@ -680,8 +678,7 @@ if [[ $option = search || $option = searchinstall ]]; then
     else
       for ((i=0 ; i<$aurtotal ; i++)); do
 		installed=''
-		existsinlocal "${aurname[i]}" "${version[i]}" && installed=' [installed]'
-		#isdevel "" && installed=' [devel]'
+		existsinlocal "${aurname[i]}" && installed=' [installed]'
         echo -e "${COLOR3}aur/${COLOR1}${aurname[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}$installed\n    ${description[$i]}"
       done
     fi
