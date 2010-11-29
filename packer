@@ -118,7 +118,12 @@ existsinaur() {
 
 # Tests whether $1 exists in pacman
 existsinpacman() {
-  $pacman -Si -- "$1" &>/dev/null
+  #$pacman -Si -- "$1" &>/dev/null
+  for dir in $(ls -1 "$dbpath/sync"); do
+    [ -d "$(ls -1 "$dbpath/sync/$dir" | sed -n "/^\($1-[0-9._]\+-[0-9]\+\)/{s##$dbpath/sync/$dir/\1#;p;};")" ] && return 0
+  done
+
+  return 1
 }
 
 # Tests whether $1 is provided in pacman, sets globally accessibly providepkg var
@@ -135,7 +140,7 @@ existsinpacmangroup() {
 # Tests whether $1 exists locally
 existsinlocal() {
   #$pacman -Qq -- "$1" &>/dev/null
-  [ -d "$(ls -1 "$dbpath/local" | sed -n "/^\($1-[a-zA-Z0-9.]\+-[0-9]\+\)/{s##$dbpath/local/\1#;p;};")" ] && return 0
+  [ -d "$(ls -1 "$dbpath/local" | sed -n "/^\($1-[0-9._]\+-[0-9]\+\)/{s##$dbpath/local/\1#;p;};")" ] && return 0
   return 1
 }
 
