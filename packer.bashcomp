@@ -6,9 +6,9 @@ _packer()
 	local prev="${COMP_WORDS[COMP_CWORD-1]}"
 	local first="${COMP_WORDS[1]}"
 
-	local actions="-S -Syu -Su -Ss -Ssq -Si -Sc -Scc -G"
+	local actions="-S -Syu -Su -Ss -Ssq -Si -Sc -Scc -G -h --help"
 	
-	local options="--quiet --ignore --noconfirm --asexplicit --asdeps --noedit --auronly --devel --skipinteg -h --help"
+	local options="--quiet --ignore --noconfirm --asexplicit --asdeps --noedit --auronly --devel --skipinteg"
 	
 	if [ $COMP_CWORD == 1 ]; then
 		COMPREPLY=($(compgen -W "$actions" -- "$cur"))
@@ -17,8 +17,9 @@ _packer()
 			COMPREPLY=($(compgen -W "$options" -- "$cur"))
 		else
 			case "$first" in
-				-G|-Su|-Syu|-Sc|-Scc)
+				-G|-Su|-Syu|-Sc|-Scc|-h|--help)
 					COMPREPLY=()
+					return
 					;;
 				-*)
 					COMPREPLY=($(compgen -W "$(pacman -Slq)" -- "$cur"))
