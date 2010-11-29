@@ -135,7 +135,7 @@ existsinpacmangroup() {
 # Tests whether $1 exists locally
 existsinlocal() {
   #$pacman -Qq -- "$1" &>/dev/null
-  [ -d "$dbpath/local/$(ls -1 "$dbpath/local" | egrep "$1-[0-9.]+-[0-9]+")" ] && return 0
+  [ -d "$(ls -1 "$dbpath/local" | sed -n "/^\($1-[a-zA-Z0-9.\s\\]\+-[0-9]\+\)/{s##$dbpath/local/\1#;p;};")" ] && return 0
   return 1
 }
 
