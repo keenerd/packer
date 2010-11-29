@@ -11,6 +11,9 @@ makepkgconf='/etc/makepkg.conf'
 usermakepkgconf="$HOME/.makepkg.conf"
 pacmanconf='/etc/pacman.conf'
 
+dbpath="$(cat $pacmanconf | sed -n '/[^#]*DBPath\s*=\s*\([a-zA-Z0-9\s/]\+\)/{s//\1/;p;};')"
+[[ "$dbpath" == "" ]] && dbpath='/var/lib/pacman'
+
 RPCURL="http://aur.archlinux.org/rpc.php?type"
 PKGURL="http://aur.archlinux.org/packages"
 
@@ -95,6 +98,18 @@ isignored() {
   [[ " ${ignoredpackages[@]} " =~ " $1 " ]]
 }
 
+isdevel() {
+  unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
+  . "$1"
+  if [[ "$(LC_ALL=C vercmp "$pkgver" "$ver")" -gt 0 ]]; then
+	  return 0
+  elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then
+	  return 0
+  fi
+
+  return 1
+}
+
 # Tests whether $1 exists on the aur
 existsinaur() {
   rpcinfo "$1"
@@ -119,7 +134,9 @@ existsinpacmangroup() {
 
 # Tests whether $1 exists locally
 existsinlocal() {
-  $pacman -Qq -- "$1" &>/dev/null
+  #$pacman -Qq -- "$1" &>/dev/null
+  [ -d "$dbpath/local/$1" ] && return 0
+  return 1
 }
 
 # Scrapes the aur deps from PKGBUILDS and puts in globally available dependencies array
@@ -538,13 +555,7 @@ if [[ $option = update ]]; then
       if isignored "$pkg"; then
         continue
       fi
-      unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
-      . "$tmpdir/$pkg.PKGBUILD"
-      if [[ "$(LC_ALL=C vercmp "$pkgver" "$ver")" -gt 0 ]]; then
-        newpackages+=("$pkg")
-      elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
-        newpackages+=("$pkg")
-      fi
+	  isdevel "$tmpdir/$pkg.PKGBUILD" && newpackages+=("$pkg")
     done
   else
     for ((i=0; i<$total; i++)); do 
@@ -666,7 +677,10 @@ if [[ $option = search || $option = searchinstall ]]; then
       done
     else
       for ((i=0 ; i<$aurtotal ; i++)); do
-        echo -e "${COLOR3}aur/${COLOR1}${aurname[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}\n    ${description[$i]}"
+		installed=''
+		existsinlocal "${aurname[i]}-${version[i]}" && installed=' [installed]'
+		#isdevel "" && installed=' [devel]'
+        echo -e "${COLOR3}aur/${COLOR1}${aurname[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}$installed\n    ${description[$i]}"
       done
     fi
   else
