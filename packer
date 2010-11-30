@@ -681,7 +681,7 @@ if [[ $option = search || $option = searchinstall ]]; then
     else
       for ((i=0 ; i<$aurtotal ; i++)); do
         installed=''
-        existsinlocal "${aurname[i]}" && installed=" ${COLOR7}[installed]${ENDCOLOR}"
+        existsinlocal "${aurname[i]}" && installed=" [installed]"
         echo -e "${COLOR3}aur/${COLOR1}${aurname[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}$installed\n    ${description[$i]}"
       done
     fi
