@@ -9,6 +9,10 @@ _packer()
 	local actions="-S -Syu -Su -Ss -Ssq -Si -Sc -Scc -G -h --help"
 	
 	local options="--quiet --ignore --noconfirm --asexplicit --asdeps --noedit --auronly --devel --skipinteg --aursort"
+
+	local pacmanconf='/etc/pacman.conf'
+	local dbpath="$(cat $pacmanconf | sed -n '/^\s*DBPath\s*=\s*\([a-zA-Z0-9\s/\\]\+\)/{s//\1/;p;};')"
+	[[ "$dbpath" == "" ]] && dbpath='/var/lib/pacman'
 	
 	if [ $COMP_CWORD == 1 ]; then
 		COMPREPLY=($(compgen -W "$actions" -- "$cur"))
@@ -22,8 +26,11 @@ _packer()
 					return
 					;;
 				-*)
-					local locpac="$(ls -1 /var/lib/pacman/local | sed -n '/^\([a-zA-Z0-9-]\+\)-[0-9._]\+-[0-9]\+/{s//\1/;p;};')"
-					COMPREPLY=($(compgen -W "$(pacman -Slq) $locpac" -- "$cur"))
+					local locpac="$(ls -1 /var/lib/pacman/local | sed -n '/^\([a-zA-Z0-9-]\+\)-[0-9._]\+-[0-9.]\+/{s//\1/;p;};')"
+					for dir in $(ls -1 "$dbpath/sync"); do
+            local syncpac+=" $(ls -1 "$dbpath/sync/$dir" | sed -n '/^\([a-zA-Z0-9_-]\+\)-[0-9._]\+-[0-9.]\+/{s//\1/;p;};')"
+					done
+					COMPREPLY=($(compgen -W "$syncpac $locpac" -- "$cur"))
 					;;
 			esac
 		fi
@@ -31,3 +38,5 @@ _packer()
 }
 
 complete -o default -F _packer packer
+
+# vim:ts=2 sw=2 et
