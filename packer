@@ -698,14 +698,14 @@ if [[ $option = search || $option = searchinstall ]]; then
           installed=''
           existsinlocal "${aurname[i]}" && installed=" [installed]"
           while IFS=';' read -ra ENTRY; do 
-            echo -e "${COLOR3}aur/${COLOR1}${ENTRY[0]} ${COLOR2}${ENTRY[1]}${ENDCOLOR}\n    ${ENTRY[2]}"
+            echo -e "${COLOR3}aur/${COLOR1}${ENTRY[0]} ${COLOR2}${ENTRY[1]}${ENDCOLOR}${installed}\n    ${ENTRY[2]}"
           done <<< "${aurall_sorted[$i]}"
         done
       else
         for ((i=0 ; i<$aurtotal ; i++)); do
           installed=''
           existsinlocal "${aurname[i]}" && installed=" [installed]"
-          echo -e "${COLOR3}aur/${COLOR1}${aurname[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}$installed\n    ${description[$i]}"
+          echo -e "${COLOR3}aur/${COLOR1}${aurname[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}${installed}\n    ${description[$i]}"
         done
       fi
     fi
@@ -721,13 +721,16 @@ if [[ $option = search || $option = searchinstall ]]; then
         for ((i=$pactotal ; i<$alltotal ; i++)); do
           elem="$(($i-$pactotal))"
           while IFS=';' read -ra ENTRY; do 
-            echo -e "$i ${COLOR3}aur/${COLOR1}${ENTRY[0]} ${COLOR2}${ENTRY[1]}${ENDCOLOR}\n    ${ENTRY[2]}"
+            installed=''
+            existsinlocal "${ENTRY[0]}" && installed=" [installed]"
+            echo -e "$i ${COLOR3}aur/${COLOR1}${ENTRY[0]} ${COLOR2}${ENTRY[1]}${ENDCOLOR}${installed}\n    ${ENTRY[2]}"
           done <<< "${aurall_sorted[$elem]}"
         done
       else
         for ((i=$pactotal ; i<$alltotal ; i++)); do
-          elem="$(($i-$pactotal))"
-          echo -e "$i ${COLOR3}aur/${COLOR1}${ENTRY[0]} ${COLOR2}${ENTRY[1]}${ENDCOLOR}\n    ${description[$i]}"
+          installed=''
+          existsinlocal "${aurname[i]}" && installed=" [installed]"
+          echo -e "$i ${COLOR3}aur/${COLOR1}${aurname[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}${installed}\n    ${description[$i]}"
         done
       fi
     fi
