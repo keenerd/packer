@@ -25,7 +25,7 @@ _packer_options=(
 	'--auronly[only do actions for aur]' 
 	'--devel[update devel packages during -Su]' 
 	'--skipinteg[when using makepkg, do not check md5s]' 
-	'--aursort[when search, sort AUR results alphabetically]' 
+	'--aursort[when searching, sort AUR results alphabetically]' 
 )
 
 
