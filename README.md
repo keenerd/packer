@@ -130,6 +130,7 @@ it requires you to use at least pacman as well. There's no reason you
 can't use it with something else (such as yaourt) too.
 
 Authors
+-------
 
  * Matthew Bruenig <matthewbruenig@gmail.com>
 
