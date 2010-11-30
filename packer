@@ -485,14 +485,14 @@ while [[ $1 ]]; do
     '-Ssq'|'-Sqs') option=search ; quiet='1' ;;
     '-Si') option=info ;;
     '-Su'|'-Suy'|'-Syu'|'-Syyu'|'-Suyy'|'Syuy') option=update ; pacmanarg="$1" ;;
-	'-Sc'|'-Scc') option=clean ; pacmanarg="$1" ;;
+    '-Sc'|'-Scc') option=clean ; pacmanarg="$1" ;;
     '-G') option=download ;;
     '-h'|'--help') usage ;;
     '--quiet') quiet='1' ;;
     '--ignore') ignorearg="$2" ; PACOPTS+=("--ignore" "$2") ; shift ;;
     '--noconfirm') noconfirm='1' PACOPTS+=("--noconfirm");;
-	'--asexplicit') PACOPTS+=('--asexplicit');;
-	'--asdeps') PACOPTS+=('--asdeps');;
+    '--asexplicit') PACOPTS+=('--asexplicit');;
+    '--asdeps') PACOPTS+=('--asdeps');;
     '--noedit') noedit='1' ;;
     '--auronly') auronly='1' ;;
     '--devel') devel='1' ;;
