@@ -830,9 +830,9 @@ if [[ $option = clean ]]; then
   fi
 
   echo
-  echo -en "${COLOR1}packertmp:${ENDCOLOR} '$tmpdir'"
+  echo -en "${COLOR1}packertmp:${ENDCOLOR} $tmpdir"
   if [[ "$rmbuilddir" != "" ]]; then
-    echo -e "\n${COLOR1}packerbuild:${ENDCOLOR} '$builddir'"
+    echo -e "\n${COLOR1}packerbuild:${ENDCOLOR} $builddir"
   else
     echo
   fi
