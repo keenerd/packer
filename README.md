@@ -18,6 +18,7 @@ locations:
  * packer: /usr/bin/packer
  * packer.8: /usr/share/man/man8/packer.8
  * packer.bashcomp: /etc/bash_completion.d/packer
+ * packer.zshcomp: /usr/share/zsh/site-functions/_packer
 
 Usage:
 ------
