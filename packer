@@ -695,7 +695,7 @@ if [[ $option = search || $option = searchinstall ]]; then
     else
       if [[ $aursort == 1 ]]; then
         for ((i=0 ; i<$aurtotal ; i++)); do
-          installed=''
+          unset installed
           existsinlocal "${aurname[i]}" && installed=" [installed]"
           while IFS=';' read -ra ENTRY; do 
             echo -e "${COLOR3}aur/${COLOR1}${ENTRY[0]} ${COLOR2}${ENTRY[1]}${ENDCOLOR}${installed}\n    ${ENTRY[2]}"
@@ -703,7 +703,7 @@ if [[ $option = search || $option = searchinstall ]]; then
         done
       else
         for ((i=0 ; i<$aurtotal ; i++)); do
-          installed=''
+          unset installed
           existsinlocal "${aurname[i]}" && installed=" [installed]"
           echo -e "${COLOR3}aur/${COLOR1}${aurname[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}${installed}\n    ${description[$i]}"
         done
@@ -721,7 +721,7 @@ if [[ $option = search || $option = searchinstall ]]; then
         for ((i=$pactotal ; i<$alltotal ; i++)); do
           elem="$(($i-$pactotal))"
           while IFS=';' read -ra ENTRY; do 
-            installed=''
+            unset installed
             existsinlocal "${ENTRY[0]}" && installed=" [installed]"
             echo -e "$i ${COLOR3}aur/${COLOR1}${ENTRY[0]} ${COLOR2}${ENTRY[1]}${ENDCOLOR}${installed}\n    ${ENTRY[2]}"
           done <<< "${aurall_sorted[$elem]}"
@@ -729,7 +729,7 @@ if [[ $option = search || $option = searchinstall ]]; then
       else
         for ((i=$pactotal ; i<$alltotal ; i++)); do
           elem="$(($i-$pactotal))"
-          installed=''
+          unset installed
           existsinlocal "${aurname[i]}" && installed=" [installed]"
           echo -e "$i ${COLOR3}aur/${COLOR1}${aurname[$elem]} ${COLOR2}${version[$elem]}${ENDCOLOR}${installed}\n    ${description[$elem]}"
         done
