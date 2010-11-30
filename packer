@@ -728,9 +728,10 @@ if [[ $option = search || $option = searchinstall ]]; then
         done
       else
         for ((i=$pactotal ; i<$alltotal ; i++)); do
+          elem="$(($i-$pactotal))"
           installed=''
           existsinlocal "${aurname[i]}" && installed=" [installed]"
-          echo -e "$i ${COLOR3}aur/${COLOR1}${aurname[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}${installed}\n    ${description[$i]}"
+          echo -e "$i ${COLOR3}aur/${COLOR1}${aurname[$elem]} ${COLOR2}${version[$elem]}${ENDCOLOR}${installed}\n    ${description[$elem]}"
         done
       fi
     fi
