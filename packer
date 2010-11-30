@@ -103,9 +103,9 @@ isdevel() {
   unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
   . "$1"
   if [[ "$(LC_ALL=C vercmp "$pkgver" "$ver")" -gt 0 ]]; then
-	  return 0
+    return 0
   elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then
-	  return 0
+    return 0
   fi
 
   return 1
@@ -509,10 +509,10 @@ done
 # Sanity checks
 [[ $option ]] || option="searchinstall"
 if [[ -z $packageargs ]]; then
-	case "$option" in
-		'update'|'clean') ;;
-		*) err "Must specify a package."
-	esac
+  case "$option" in
+    'update'|'clean') ;;
+    *) err "Must specify a package."
+  esac
 fi
 
 # Install (-S) handling
@@ -560,7 +560,7 @@ if [[ $option = update ]]; then
       if isignored "$pkg"; then
         continue
       fi
-	  isdevel "$tmpdir/$pkg.PKGBUILD" && newpackages+=("$pkg")
+    isdevel "$tmpdir/$pkg.PKGBUILD" && newpackages+=("$pkg")
     done
   else
     for ((i=0; i<$total; i++)); do 
@@ -822,31 +822,31 @@ fi
 
 # Clean (-Sc) handling
 if [[ $option = clean ]]; then
-	runasroot $outputpacman "${PACOPTS[@]}" "$pacmanarg"
+  runasroot $outputpacman "${PACOPTS[@]}" "$pacmanarg"
 
-	builddir="${TMPDIR:-/tmp}/packerbuild-$UID"
-	if [[ "$pacmanarg" == "-Scc" ]]; then
-		rmbuilddir=" and packerbuild"
-	fi
+  builddir="${TMPDIR:-/tmp}/packerbuild-$UID"
+  if [[ "$pacmanarg" == "-Scc" ]]; then
+    rmbuilddir=" and packerbuild"
+  fi
 
-	echo
-	echo -en "${COLOR1}packertmp:${ENDCOLOR} '$tmpdir'"
-	if [[ "$rmbuilddir" != "" ]]; then
-		echo -e "\n${COLOR1}packerbuild:${ENDCOLOR} '$builddir'"
-	else
-		echo
-	fi
-	echo -n "Do you want to remove packertmp$rmbuilddir? [y/N] "
-	read answer
-	case "$answer" in
-		'Y'|'y')
-			echo "removing packertmp$rmbuilddir..."
-			rm -fr "$tmpdir"
+  echo
+  echo -en "${COLOR1}packertmp:${ENDCOLOR} '$tmpdir'"
+  if [[ "$rmbuilddir" != "" ]]; then
+    echo -e "\n${COLOR1}packerbuild:${ENDCOLOR} '$builddir'"
+  else
+    echo
+  fi
+  echo -n "Do you want to remove packertmp$rmbuilddir? [y/N] "
+  read answer
+  case "$answer" in
+    'Y'|'y')
+      echo "removing packertmp$rmbuilddir..."
+      rm -fr "$tmpdir"
 
-			if [[ "$rmbuilddir" != "" ]]; then
-				rm -fr "$builddir"
-			fi
-	esac
+      if [[ "$rmbuilddir" != "" ]]; then
+        rm -fr "$builddir"
+      fi
+  esac
 fi
 
 # vim:ts=2 sw=2 et
