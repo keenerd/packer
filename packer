@@ -62,6 +62,7 @@ usage() {
   echo '    --auronly    - only do actions for aur'
   echo '    --devel      - update devel packages during -Su'
   echo '    --skipinteg  - when using makepkg, do not check md5s'
+  echo '    --aursort    - sort AUR search results alphabetically'
   echo '    -h           - outputs this message'
   exit
 }

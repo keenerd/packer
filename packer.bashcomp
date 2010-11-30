@@ -8,7 +8,7 @@ _packer()
 
 	local actions="-S -Syu -Su -Ss -Ssq -Si -Sc -Scc -G -h --help"
 	
-	local options="--quiet --ignore --noconfirm --asexplicit --asdeps --noedit --auronly --devel --skipinteg"
+	local options="--quiet --ignore --noconfirm --asexplicit --asdeps --noedit --auronly --devel --skipinteg --aursort"
 	
 	if [ $COMP_CWORD == 1 ]; then
 		COMPREPLY=($(compgen -W "$actions" -- "$cur"))
