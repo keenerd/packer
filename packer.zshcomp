@@ -26,6 +26,7 @@ _packer_options=(
 	'--devel[update devel packages during -Su]' 
 	'--skipinteg[when using makepkg, do not check md5s]' 
 	'--aursort[when searching, sort AUR results alphabetically]' 
+	'--color[colorize, even when piping, but only AUR]' 
 )
 
 

@@ -61,6 +61,8 @@ One is that packer only supports the following actions and options:
    skip makepkg's integrity checks
  * --aursort
    sort AUR search results alphabetically
+ * --color
+   colorize AUR actions, even when piping
  * -h, --help
    print a usage message
  * --
@@ -101,6 +103,10 @@ Search and install using interactive mode:
 Launch interactive mode, but install as dependencies:
 
 	packer --asdeps <package>
+
+Search for a package, colorize results, and display in less:
+
+	packer -Ss --color <package> | less -R
 
 Configuration
 -------------

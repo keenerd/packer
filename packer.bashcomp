@@ -8,7 +8,7 @@ _packer()
 
   local actions="-S -Syu -Su -Ss -Ssq -Si -Sc -Scc -G -h --help"
   
-  local options="--quiet --ignore --noconfirm --asexplicit --asdeps --noedit --auronly --devel --skipinteg --aursort"
+  local options="--quiet --ignore --noconfirm --asexplicit --asdeps --noedit --auronly --devel --skipinteg --aursort --color"
 
   local pacmanconf='/etc/pacman.conf'
   local dbpath="$(cat $pacmanconf | sed -n '/^\s*DBPath\s*=\s*\([a-zA-Z0-9\s/\\]\+\)/{s//\1/;p;};')"

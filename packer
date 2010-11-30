@@ -19,7 +19,8 @@ PKGURL="http://aur.archlinux.org/packages"
 
 pacman="$(type -p pacman)"
 outputpacman="$(type -p pacman-color)"
-if [[ $outputpacman && ! $COLOR = "NO" ]]; then
+
+setcolors() {
   COLOR1='\e[1;39m'
   COLOR2='\e[1;32m'
   COLOR3='\e[1;35m'
@@ -28,6 +29,10 @@ if [[ $outputpacman && ! $COLOR = "NO" ]]; then
   COLOR6='\e[1;33m'
   COLOR7='\e[1;31m'
   ENDCOLOR='\e[0m'
+}
+
+if [[ $outputpacman && ! $COLOR = "NO" && -t 1 ]]; then
+  setcolors
 else
   outputpacman="$pacman"
 fi
@@ -63,6 +68,7 @@ usage() {
   echo '    --devel      - update devel packages during -Su'
   echo '    --skipinteg  - when using makepkg, do not check md5s'
   echo '    --aursort    - sort AUR search results alphabetically'
+  echo '    --color      - use colors for AUR when piping'
   echo '    -h           - outputs this message'
   exit
 }
@@ -499,6 +505,7 @@ while [[ $1 ]]; do
     '--devel') devel='1' ;;
     '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
     '--aursort') aursort=1 ;;
+    '--color') setcolors && outputpacman="$(type -p pacman-color)" ;;
     '--') shift ; packageargs+=("$@") ; break ;;
     -*) echo "packer: Option \`$1' is not valid." ; exit 5 ;;
     *) packageargs+=("$1") ;;
