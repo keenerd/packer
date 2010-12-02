@@ -165,7 +165,7 @@ finddeps() {
   aurdeps=()
   scrapeaurdeps "$1"
   missingdeps=( $($pacman -T "${dependencies[@]}") )
-  while (( ${#missingdeps[@]} > 0 )); do
+  while [[ $missingdeps ]]; do
     checkdeps=()
     for dep in "${missingdeps[@]}"; do
       if [[ " $1 ${aurdeps[@]} ${pacmandeps[@]} " =~ " $dep " ]];  then
@@ -177,7 +177,7 @@ finddeps() {
         aurdeps+=("$dep")
         checkdeps+=("$dep")
       elif providedinpacman "$dep"; then
-        pacmandeps+=("${providepkg[@]}")
+        pacmandeps+=("$providepkg")
       else
         [[ $option = "install" ]] &&  err "Dependency \`$dep' of \`$1' does not exist."
         echo "Dependency \`$dep' of \`$1' does not exist."
