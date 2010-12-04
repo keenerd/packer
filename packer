@@ -192,6 +192,7 @@ finddeps() {
       done
     done
   done
+  return 0
 }
 
 # Displays a progress bar ($1 is numerator, $2 is denominator, $3 is candy/normal)
