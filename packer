@@ -70,6 +70,7 @@ usage() {
   echo '    --force      - install even if there are file-conflicts'
   echo '    --aursort    - sort AUR search results alphabetically'
   echo '    --color      - use colors for AUR when piping'
+  echo '    --keeptar    - do not delete tarball from -G'
   echo '    -h           - outputs this message'
   exit
 }
@@ -510,6 +511,7 @@ while [[ $1 ]]; do
     '--force') PACOPTS+=('--force') ;;
     '--aursort') aursort=1 ;;
     '--color') setcolors && outputpacman="$(type -p pacman-color)" ;;
+    '--keeptar') keeptar=1 ;;
     '--') shift ; packageargs+=("$@") ; break ;;
     -*) echo "packer: Option \`$1' is not valid." ; exit 5 ;;
     *) packageargs+=("$1") ;;
@@ -623,7 +625,7 @@ if [[ $option = download ]]; then
   for package in "${pkglist[@]}"; do
     curl -fs "$PKGURL/$package/$package.tar.gz" > "$package.tar.gz"
     tar xf "$package.tar.gz"
-    rm -f "$package.tar.gz"
+    [[ "$keeptar" != "1" ]] && rm -f "$package.tar.gz"
   done
 fi
 

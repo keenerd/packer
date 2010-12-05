@@ -28,6 +28,7 @@ _packer_options=(
 	'--aursort[when searching, sort AUR results alphabetically]' 
 	'--color[colorize, even when piping, but only AUR]' 
 	'--force[install even if there are file-conflicts]' 
+	'--keeptar[do not delete tarball from -G]' 
 )
 
 
