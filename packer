@@ -622,7 +622,8 @@ if [[ $option = download ]]; then
 
   for package in "${pkglist[@]}"; do
     curl -fs "$PKGURL/$package/$package.tar.gz" > "$package.tar.gz"
-    tar xf "$package.tar.gz" 
+    tar xf "$package.tar.gz"
+    rm -f "$package.tar.gz"
   done
 fi
 
