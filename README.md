@@ -59,6 +59,8 @@ One is that packer only supports the following actions and options:
    add all VCS packages to the list of packages to be updated
  * --skipinteg
    skip makepkg's integrity checks
+ * --force
+   ignore file-conflicts and install anyways
  * --aursort
    sort AUR search results alphabetically
  * --color

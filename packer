@@ -67,6 +67,7 @@ usage() {
   echo '    --auronly    - only do actions for aur'
   echo '    --devel      - update devel packages during -Su'
   echo '    --skipinteg  - when using makepkg, do not check md5s'
+  echo '    --force      - install even if there are file-conflicts'
   echo '    --aursort    - sort AUR search results alphabetically'
   echo '    --color      - use colors for AUR when piping'
   echo '    -h           - outputs this message'
@@ -506,6 +507,7 @@ while [[ $1 ]]; do
     '--auronly') auronly='1' ;;
     '--devel') devel='1' ;;
     '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
+    '--force') PACOPTS+=('--force') ;;
     '--aursort') aursort=1 ;;
     '--color') setcolors && outputpacman="$(type -p pacman-color)" ;;
     '--') shift ; packageargs+=("$@") ; break ;;
