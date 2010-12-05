@@ -126,7 +126,7 @@ existsinaur() {
 # Tests whether $1 exists in pacman
 existsinpacman() {
   for dir in $(ls -1 "$dbpath/sync"); do
-    [ -d "$(ls -1 "$dbpath/sync/$dir" | sed -n "/^\($1-[0-9._]\+-[0-9.]\+\)/{s##$dbpath/sync/$dir/\1#;p;};")" ] && return 0
+    [ -d "$(ls -1 "$dbpath/sync/$dir" | sed -n "/^\($1-[rcbeta0-9._]\+-[0-9.]\+\)/{s##$dbpath/sync/$dir/\1#;p;};")" ] && return 0
   done
 
   return 1
@@ -145,7 +145,7 @@ existsinpacmangroup() {
 
 # Tests whether $1 exists locally
 existsinlocal() {
-  [ -d "$(ls -1 "$dbpath/local" | sed -n "/^\($1-[0-9._]\+-[0-9.]\+\)/{s##$dbpath/local/\1#;p;};")" ] && return 0
+  [ -d "$(ls -1 "$dbpath/local" | sed -n "/^\($1-[rcbeta0-9._]\+-[0-9.]\+\)/{s##$dbpath/local/\1#;p;};")" ] && return 0
   return 1
 }
 
