@@ -550,7 +550,7 @@ if [[ $option = make ]]; then
 
   for dep in "${aurdeps[@]}"; do
     if ! existsinlocal "$dep"; then
-      aurinstall "$dep" dependancy
+      aurinstall "$dep" dependency
     fi
   done
 
