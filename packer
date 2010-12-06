@@ -56,6 +56,7 @@ usage() {
   echo '    -Ss|-Ssq     - searches for package'
   echo '    -Si          - outputs info for package'
   echo '    -Sc|-Scc     - clean up package files and tmpdir'
+  echo '    -U           - make local PKGBUILD with AUR support'
   echo '    -G           - download and extract aur tarball only'
   echo
   echo '    --quiet      - only output package name for searches'
@@ -497,6 +498,7 @@ while [[ $1 ]]; do
     '-Si') option=info ;;
     '-Su'|'-Suy'|'-Syu'|'-Syyu'|'-Suyy'|'Syuy') option=update ; pacmanarg="$1" ;;
     '-Sc'|'-Scc') option=clean ; pacmanarg="$1" ;;
+    '-U') option=make ; shift ; MAKEPKGOPTS+=("$@") ; break ;;
     '-G') option=download ;;
     '-h'|'--help') usage ;;
     '--quiet') quiet='1' ;;
@@ -523,7 +525,7 @@ done
 [[ $option ]] || option="searchinstall"
 if [[ -z $packageargs ]]; then
   case "$option" in
-    'update'|'clean') ;;
+    'update'|'clean'|'make') ;;
     *) err "Must specify a package."
   esac
 fi
@@ -531,6 +533,29 @@ fi
 # Install (-S) handling
 if [[ $option = install ]]; then
   installhandling "${packageargs[@]}"
+  exit
+fi
+
+# Make (-U) handling
+if [[ $option = make ]]; then
+  sourcemakepkgconf
+  . PKGBUILD
+  for dep in "${depends[@]}"; do
+    if existsinpacman $dep; then
+      pacdeps+=("$dep")
+    elif existsinaur $dep; then
+      aurdeps+=("$dep")
+    fi
+  done
+
+  for dep in "${aurdeps[@]}"; do
+    if ! existsinlocal "$dep"; then
+      aurinstall "$dep" dependancy
+    fi
+  done
+
+  makepkg ${MAKEPKGOPTS[@]} -s -i
+
   exit
 fi
 
