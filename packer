@@ -538,7 +538,12 @@ fi
 
 # Make (-U) handling
 if [[ $option = make ]]; then
+  if ! [ -f PKGBUILD ]; then
+    err "${COLOR7}==> ERROR: ${COLOR1}PKGBUILD does not exist.${ENDCOLOR}"
+  fi
+
   sourcemakepkgconf
+
   . PKGBUILD
   for dep in "${depends[@]}"; do
     if existsinpacman $dep; then
