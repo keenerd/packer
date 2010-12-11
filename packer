@@ -11,8 +11,8 @@ makepkgconf='/etc/makepkg.conf'
 usermakepkgconf="$HOME/.makepkg.conf"
 pacmanconf='/etc/pacman.conf'
 
-RPCURL="http://aur.archlinux.org/rpc.php?type"
-PKGURL="http://aur.archlinux.org/packages"
+RPCURL="https://aur.archlinux.org/rpc.php?type"
+PKGURL="https://aur.archlinux.org/packages"
 
 pacman="$(type -p pacman)"
 outputpacman="$(type -p pacman-color)"
