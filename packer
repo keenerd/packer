@@ -14,8 +14,8 @@ pacmanconf='/etc/pacman.conf'
 dbpath="$(cat $pacmanconf | sed -n '/^\s*DBPath\s*=\s*\([a-zA-Z0-9\s/\\]\+\)/{s//\1/;p;};')"
 [[ "$dbpath" == "" ]] && dbpath='/var/lib/pacman'
 
-RPCURL="http://aur.archlinux.org/rpc.php?type"
-PKGURL="http://aur.archlinux.org/packages"
+RPCURL="https://aur.archlinux.org/rpc.php?type"
+PKGURL="https://aur.archlinux.org/packages"
 
 pacman="$(type -p pacman)"
 outputpacman="$(type -p pacman-color)"
@@ -246,13 +246,13 @@ aurbar() {
 
 rpcinfo() {
   if ! [[ -f "$tmpdir/$1.info" ]]; then
-    curl -fGs --data-urlencode "arg=$1" "$RPCURL=info" > "$tmpdir/$1.info"
+    curl -LfGs --data-urlencode "arg=$1" "$RPCURL=info" > "$tmpdir/$1.info"
   fi
 }
 
 pkginfo() {
   if ! [[ -f "$tmpdir/$1.PKGBUILD" ]]; then
-    curl -fs "$PKGURL/$1/$1/PKGBUILD" > "$tmpdir/$1.PKGBUILD"
+    curl -Lfs "$PKGURL/$1/$1/PKGBUILD" > "$tmpdir/$1.PKGBUILD"
   fi
 }
 
@@ -286,7 +286,7 @@ aurinstall() {
     [[ -d $dir ]] && rm -rf $dir
     mkdir -p "$dir"
     cd "$dir"
-    curl -fs "$PKGURL/$1/$1.tar.gz" > "$1.tar.gz"
+    curl -Lfs "$PKGURL/$1/$1.tar.gz" > "$1.tar.gz"
     tar xf "$1.tar.gz"
     cd "$1"
   fi
@@ -648,8 +648,8 @@ if [[ $option = download ]]; then
   done
 
   for package in "${pkglist[@]}"; do
-    curl -fs "$PKGURL/$package/$package.tar.gz" > "$package.tar.gz"
-    tar xf "$package.tar.gz"
+    curl -Lfs "$PKGURL/$package/$package.tar.gz" > "$package.tar.gz"
+    tar xf "$package.tar.gz" 
     [[ "$keeptar" != "1" ]] && rm -f "$package.tar.gz"
   done
 fi
@@ -693,10 +693,10 @@ if [[ $option = search || $option = searchinstall ]]; then
   # Aur searching and tmpfile preparation
   if  [[ ${#packageargs[@]} -eq 1 ]]; then
     # Fill up the arrays with package information from dump file
-    curl -fGs --data-urlencode "arg=$packageargs" "$RPCURL=search" | sed -e 's/","/"\n"/g' -e 's/\\//g' > "$tmpdir/$packageargs.search" 
+    curl -LfGs --data-urlencode "arg=$packageargs" "$RPCURL=search" | sed -e 's/","/"\n"/g' -e 's/\\//g' > "$tmpdir/$packageargs.search" 
     parsefile="$tmpdir/$packageargs.search"
   else
-    curl -fGs --data-urlencode "arg=$packageargs" "$RPCURL=search" | sed -e 's/{/\n{/g' -e 's/\\//g' > "$tmpdir/$packageargs.search-0"
+    curl -LfGs --data-urlencode "arg=$packageargs" "$RPCURL=search" | sed -e 's/{/\n{/g' -e 's/\\//g' > "$tmpdir/$packageargs.search-0"
     for ((i=1 ; i<${#packageargs[@]} ; i++)); do
       grep -e "\"Name\":\".*${packageargs[$i]}.*\",\"Version" -e "\"Description\":\".*${packageargs[$i]}.*\",\"LocationID" "${tmpdir}/$packageargs.search-$((i-1))" > "$tmpdir/$packageargs.search-$i"
     done
