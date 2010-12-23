@@ -18,10 +18,10 @@ _packer()
     if [[ "$cur" == -* ]]; then
       COMPREPLY=($(compgen -W "$actions" -- "$cur"))
     elif [[ "$cur" != "" ]]; then
-      local locpac="$(ls -1 /var/lib/pacman/local | sed -n '/^\([a-zA-Z0-9_-]\+\)\(-[rcbeta0-9._]\+\)\{2\}$/{s//\1/;p;};')"
+      local locpac="$(ls -1 /var/lib/pacman/local | sed -n '/^\(.*\)\(-[^-]\+\)\{2\}$/{s//\1/;p;};')"
       unset syncpac
       for dir in $(ls -1 "$dbpath/sync"); do
-        local syncpac+=" $(ls -1 "$dbpath/sync/$dir" | sed -n '/^\([a-zA-Z0-9_-]\+\)\(-[rcbeta0-9._]\+\)\{2\}$/{s//\1/;p;};')"
+        local syncpac+=" $(ls -1 "$dbpath/sync/$dir" | sed -n '/^\(.*\)\(-[^-]\+\)\{2\}$/{s//\1/;p;};')"
       done
       COMPREPLY=($(compgen -W "$syncpac $locpac" -- "$cur"))
     fi
@@ -35,10 +35,10 @@ _packer()
           return
           ;;
         -*)
-          local locpac="$(ls -1 /var/lib/pacman/local | sed -n '/^\([a-zA-Z0-9_-]\+\)\(-[rcbeta0-9._]\+\)\{2\}$/{s//\1/;p;};')"
+          local locpac="$(ls -1 /var/lib/pacman/local | sed -n '/^\(.*\)\(-[^-]\+\)\{2\}$/{s//\1/;p;};')"
           unset syncpac
           for dir in $(ls -1 "$dbpath/sync"); do
-            local syncpac+=" $(ls -1 "$dbpath/sync/$dir" | sed -n '/^\([a-zA-Z0-9_-]\+\)\(-[rcbeta0-9._]\+\)\{2\}$/{s//\1/;p;};')"
+            local syncpac+=" $(ls -1 "$dbpath/sync/$dir" | sed -n '/^\(.*\)\(-[^-]\+\)\{2\}$/{s//\1/;p;};')"
           done
           COMPREPLY=($(compgen -W "$syncpac $locpac" -- "$cur"))
           ;;
