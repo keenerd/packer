@@ -219,7 +219,7 @@ rpcinfo() {
 
 pkginfo() {
   if ! [[ -f "$tmpdir/$1.PKGBUILD" ]]; then
-    curl -Lfs "$PKGURL/$1/$1/PKGBUILD" > "$tmpdir/$1.PKGBUILD"
+    curl -Lfs "$PKGURL/$1/PKGBUILD" > "$tmpdir/$1.PKGBUILD"
   fi
 }
 
