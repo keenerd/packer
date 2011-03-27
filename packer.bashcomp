@@ -20,8 +20,9 @@ _packer()
     elif [[ "$cur" != "" ]]; then
       local locpac="$(ls -1 /var/lib/pacman/local | sed -n '/^\(.*\)\(-[^-]\+\)\{2\}$/{s//\1/;p;};')"
       unset syncpac
-      for dir in $(ls -1 "$dbpath/sync"); do
-        local syncpac+=" $(ls -1 "$dbpath/sync/$dir" | sed -n '/^\(.*\)\(-[^-]\+\)\{2\}$/{s//\1/;p;};')"
+      for arc in $(ls -1 "$dbpath/sync"); do
+        local syncpac+=" $(bsdtar -tf "$dbpath/sync/$arc" | sed -n '/^\(.*\)\(-[^-]\+\)\{2\}\/$/{s//\1/;p;};')"
+        echo "$syncpac"
       done
       COMPREPLY=($(compgen -W "$syncpac $locpac" -- "$cur"))
     fi
@@ -37,8 +38,8 @@ _packer()
         -*)
           local locpac="$(ls -1 /var/lib/pacman/local | sed -n '/^\(.*\)\(-[^-]\+\)\{2\}$/{s//\1/;p;};')"
           unset syncpac
-          for dir in $(ls -1 "$dbpath/sync"); do
-            local syncpac+=" $(ls -1 "$dbpath/sync/$dir" | sed -n '/^\(.*\)\(-[^-]\+\)\{2\}$/{s//\1/;p;};')"
+          for arc in $(ls -1 "$dbpath/sync"); do
+            local syncpac+=" $(bsdtar -tf "$dbpath/sync/$arc" | sed -n '/^\(.*\)\(-[^-]\+\)\{2\}\/$/{s//\1/;p;};')"
           done
           COMPREPLY=($(compgen -W "$syncpac $locpac" -- "$cur"))
           ;;

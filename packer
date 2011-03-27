@@ -128,8 +128,9 @@ existsinaur() {
 
 # Tests whether $1 exists in pacman
 existsinpacman() {
-  for dir in $(ls -1 "$dbpath/sync"); do
-    [ -d "$(ls -1 "$dbpath/sync/$dir" | sed -n "/^\($1\(-[^-]\+\)\{2\}\)$/{s##$dbpath/sync/$dir/\1#;p;};")" ] && return 0
+  for arc in $(ls -1 "$dbpath/sync"); do
+    match="$(bsdtar -tf "$dbpath/sync/$arc" | sed -n "/^\($1\(-[^-]\+\)\{2\}\)\/$/{s##$dbpath/sync/$arc/\1#;p;};")"
+    [[ "$match" ]] && return 0
   done
 
   return 1
