@@ -144,7 +144,7 @@ finddeps() {
       if existsinpacman "$dep"; then
         pacmandeps+=("$dep")
       elif existsinaur "$dep"; then
-        aurdeps+=("$dep")
+        aurdeps=("$dep" "${aurdeps}")
         checkdeps+=("$dep")
       elif providedinpacman "$dep"; then
         pacmandeps+=("$providepkg")
@@ -329,7 +329,7 @@ installhandling() {
       if finddeps "$package"; then
         # here is where dep dupes are created
         aurpackages+=("$package")
-        aurdepends+=("${aurdeps[@]}")
+        aurdepends=("${aurdeps[@]}" "${aurdepends[@]}")
         pacmandepends+=("${pacmandeps[@]}")
       fi
     else
