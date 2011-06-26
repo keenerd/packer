@@ -441,7 +441,6 @@ proceed() {
 # process busy loop
 nap() {
   while (( $(jobs | wc -l) >= 8 )); do
-    sleep 0.1
     jobs > /dev/null
   done
 }
