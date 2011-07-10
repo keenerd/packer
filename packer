@@ -532,7 +532,7 @@ if [[ $option = update ]]; then
       fi
       unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
       . "$tmpdir/$pkg.PKGBUILD"
-      if [[ "$(LC_ALL=C vercmp "$pkgver-$pkgrl" "$ver")" -gt 0 ]]; then
+      if [[ "$(LC_ALL=C vercmp "$pkgver-$pkgrel" "$ver")" -gt 0 ]]; then
         newpackages+=("$pkg")
       elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
         newpackages+=("$pkg")
