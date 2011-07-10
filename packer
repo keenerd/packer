@@ -144,7 +144,11 @@ finddeps() {
       if existsinpacman "$dep"; then
         pacmandeps+=("$dep")
       elif existsinaur "$dep"; then
-        aurdeps=("$dep" "${aurdeps}")
+        if [[ $aurdeps ]]; then
+          aurdeps=("$dep" "${aurdeps}")
+        else
+          aurdeps=("$dep")
+        fi
         checkdeps+=("$dep")
       elif providedinpacman "$dep"; then
         pacmandeps+=("$providepkg")
@@ -158,7 +162,10 @@ finddeps() {
     for dep in "${checkdeps[@]}"; do
       scrapeaurdeps "$dep"
       for depdep in "${dependencies[@]}"; do
-        [[ $(pacman -T "$depdep") ]] && missingdeps+=("$depdep")
+        if [[ $(pacman -T "$depdep") ]]; then
+          echo $depdep
+          missingdeps+=("$depdep")
+        fi
       done
     done
   done
@@ -256,6 +263,12 @@ aurinstall() {
     curl -Lfs "$PKGURL/$1/$1.tar.gz" > "$1.tar.gz"
     tar xf "$1.tar.gz"
     cd "$1"
+
+    # customizepkg
+    if [[ -f "/etc/customizepkg.d/$1" ]] && type -t customizepkg &>/dev/null; then
+      echo "Applying customizepkg instructions..."
+      customizepkg --modify
+    fi
   fi
 
   # Allow user to edit PKGBUILD
