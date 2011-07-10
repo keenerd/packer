@@ -145,7 +145,7 @@ finddeps() {
         pacmandeps+=("$dep")
       elif existsinaur "$dep"; then
         if [[ $aurdeps ]]; then
-          aurdeps=("$dep" "${aurdeps}")
+          aurdeps=("$dep" "${aurdeps[@]}")
         else
           aurdeps=("$dep")
         fi
