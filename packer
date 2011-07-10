@@ -454,7 +454,7 @@ while [[ $1 ]]; do
     '-Ss') option=search ;;
     '-Ssq'|'-Sqs') option=search ; quiet='1' ;;
     '-Si') option=info ;;
-    -S*u) option=update ; pacmanarg="$1" ;;
+    -S*u*) option=update ; pacmanarg="$1" ;;
     '-G') option=download ;;
     '-h'|'--help') usage ;;
     '--quiet') quiet='1' ;;
