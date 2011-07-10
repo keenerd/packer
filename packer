@@ -162,10 +162,7 @@ finddeps() {
     for dep in "${checkdeps[@]}"; do
       scrapeaurdeps "$dep"
       for depdep in "${dependencies[@]}"; do
-        if [[ $(pacman -T "$depdep") ]]; then
-          echo $depdep
-          missingdeps+=("$depdep")
-        fi
+        [[ $(pacman -T "$depdep") ]] && missingdeps+=("$depdep")
       done
     done
   done
