@@ -16,7 +16,7 @@ PKGURL="https://aur.archlinux.org/packages"
 
 pacman="$(type -p pacman)"
 outputpacman="$(type -p pacman-color)"
-if [[ $outputpacman && ! $COLOR = "NO" ]]; then
+if [[ $outputpacman && ! $COLOR = "NO" && -t 1 ]]; then
   COLOR1='\e[1;39m'
   COLOR2='\e[1;32m'
   COLOR3='\e[1;35m'
