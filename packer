@@ -14,9 +14,7 @@ pacmanconf='/etc/pacman.conf'
 RPCURL="https://aur.archlinux.org/rpc.php?type"
 PKGURL="https://aur.archlinux.org/packages"
 
-pacman="$(type -p pacman)"
-outputpacman="$(type -p pacman-color)"
-if [[ $outputpacman && ! $COLOR = "NO" ]]; then
+if [[ -t 1 && ! $COLOR = "NO" ]]; then
   COLOR1='\e[1;39m'
   COLOR2='\e[1;32m'
   COLOR3='\e[1;35m'
@@ -24,10 +22,10 @@ if [[ $outputpacman && ! $COLOR = "NO" ]]; then
   COLOR5='\e[1;34m'
   COLOR6='\e[1;33m'
   COLOR7='\e[1;31m'
-  ENDCOLOR='\e[0m'
-else
-  outputpacman="$pacman"
+  ENDCOLOR='\e[0m' 
+  S='\\'
 fi
+_WIDTH="$(stty size | cut -d ' ' -f 2)"
 
 trap ctrlc INT
 ctrlc() {
@@ -100,23 +98,23 @@ existsinaur() {
 
 # Tests whether $1 exists in pacman
 existsinpacman() {
-  $pacman -Si -- "$1" &>/dev/null
+  pacman -Si -- "$1" &>/dev/null
 }
 
 # Tests whether $1 is provided in pacman, sets globally accessibly providepkg var
 providedinpacman() {
   IFS=$'\n'
-  providepkg=( $($pacman -Ssq -- "^$1$") )
+  providepkg=( $(pacman -Ssq -- "^$1$") )
 }
 
 # Tests whether $1 exists in a pacman group
 existsinpacmangroup() {
-  [[ $($pacman -Sgq "$1") ]]
+  [[ $(pacman -Sgq "$1") ]]
 }
 
 # Tests whether $1 exists locally
 existsinlocal() {
-  $pacman -Qq -- "$1" &>/dev/null
+  pacman -Qq -- "$1" &>/dev/null
 }
 
 # Scrapes the aur deps from PKGBUILDS and puts in globally available dependencies array
@@ -134,7 +132,7 @@ finddeps() {
   pacmandeps=()
   aurdeps=()
   scrapeaurdeps "$1"
-  missingdeps=( $($pacman -T "${dependencies[@]}") )
+  missingdeps=( $(pacman -T "${dependencies[@]}") )
   while [[ $missingdeps ]]; do
     checkdeps=()
     for dep in "${missingdeps[@]}"; do
@@ -231,8 +229,8 @@ pkginfo() {
 aurversionisnewer() {
   rpcinfo "$1"
   unset aurversion
-  if ! grep -Fq ':"No result found"' "$tmpdir/$1.info"; then
-    aurversion="$(cut -d '"' -f 18 "$tmpdir/$1.info")"
+  if existsinaur "$1"; then
+    aurversion="$(jshon -Q -e results -e Version -u < "$tmpdir/$1.info")"
     if [[ "$(LC_ALL=C vercmp "$aurversion" "$2")" -gt 0  ]]; then
       return 0
     fi
@@ -242,7 +240,18 @@ aurversionisnewer() {
 
 isoutofdate() {
   rpcinfo "$1"
-  grep -qF '"OutOfDate":"1"}}' "$tmpdir/$1.info"
+  [[ "$(jshon -Q -e results -e OutOfDate -u < "$tmpdir/$1.info")" = "1" ]]
+}
+
+# $1 is prompt, $2 is file
+confirm_edit() {
+  if [[ (! -f "$2") || "$noconfirm" || "$noedit" ]]; then
+    return
+  fi
+  echo -en "$1"
+  if proceed; then
+    ${EDITOR:-vi} "$2"
+  fi
 }
 
 # Installs packages from aur ($1 is package, $2 is dependency or explicit)
@@ -269,36 +278,15 @@ aurinstall() {
   fi
 
   # Allow user to edit PKGBUILD
-  if [[ -f PKGBUILD ]]; then
-    if ! [[ $noconfirm || $noedit ]]; then
-      echo -en "${COLOR6}Edit $1 PKGBUILD with \$EDITOR? [Y/n]${ENDCOLOR} "
-      read -n 1 answer
-      echo
-      case "$answer" in
-        'Y'|'y'|'')
-          ${EDITOR:-vi} PKGBUILD
-          ;;
-      esac
-    fi
-  else
+  confirm_edit "${COLOR6}Edit $1 PKGBUILD with \$EDITOR? [Y/n]${ENDCOLOR} " PKGBUILD
+  if ! [[ -f PKGBUILD ]]; then
     err "No PKGBUILD found in directory."
   fi
 
   # Allow user to edit .install
   unset install
   . PKGBUILD
-  if [[ $install ]]; then
-    if ! [[ $noconfirm || $noedit ]]; then
-      echo -en "${COLOR6}Edit $install with \$EDITOR? [Y/n]${ENDCOLOR} "
-      read -n 1 answer
-      echo
-      case "$answer" in
-        'Y'|'y'|'')
-          ${EDITOR:-vi} "$install"
-          ;;
-      esac 
-    fi
-  fi
+  confirm_edit "${COLOR6}Edit $install with \$EDITOR? [Y/n]${ENDCOLOR} " "$install"
 
   # Installation (makepkg and pacman)
   if [[ $UID -eq 0 ]]; then
@@ -309,9 +297,9 @@ aurinstall() {
 
   [[ $? -ne 0 ]] && echo "The build failed." && return 1
   if  [[ $2 = dependency ]]; then
-    runasroot $outputpacman ${PACOPTS[@]} --asdeps -U $pkgname-*$PKGEXT
+    runasroot pacman ${PACOPTS[@]} --asdeps -U $pkgname-*$PKGEXT
   elif [[ $2 = explicit ]]; then
-    runasroot $outputpacman ${PACOPTS[@]} -U $pkgname-*$PKGEXT
+    runasroot pacman ${PACOPTS[@]} -U $pkgname-*$PKGEXT
   fi
 }
 
@@ -343,10 +331,8 @@ installhandling() {
   for package in "${aurpackages[@]}"; do
     if isignored "$package"; then
       echo -ne "${COLOR5}:: ${COLOR1}$package is in IgnorePkg/IgnoreGroup. Install anyway?${ENDCOLOR} [Y/n] "
-      if ! [[ $noconfirm ]]; then
-        if ! proceed; then
-          continue
-        fi
+      if [[ -z "$noconfirm" && $(! proceed) ]]; then
+        continue
       fi
     fi
     aurtargets+=("$package")
@@ -356,95 +342,90 @@ installhandling() {
   for package in "${aurdepends[@]}"; do
     if isignored "$package"; then
       echo -ne "${COLOR5}:: ${COLOR1}$package is in IgnorePkg/IgnoreGroup. Install anyway?${ENDCOLOR} [Y/n] "
-      if ! [[ $noconfirm ]]; then
-        if ! proceed; then
+      if [[ -z "$noconfirm" && $(! proceed) ]]; then
           echo "Unresolved dependency \`$package'"
           unset aurtargets
           break
-        fi
       fi
     fi
   done
  
-  # If only pacman packages, then call pacman
-  if [[ $pacmanpackages && -z $aurtargets ]]; then
-    runasroot $outputpacman "${PACOPTS[@]}" -S -- "${pacmanpackages[@]}"
-    exit
-  elif [[ $aurtargets ]]; then
-    # First install the explicit pacman packages, let pacman prompt
-    if [[ $pacmanpackages ]]; then
-      runasroot $outputpacman "${PACOPTS[@]}" -S -- "${pacmanpackages[@]}"
-    fi
-
-    # Test if aurpackages are already installed; echo warning if so
-    for pkg in "${aurtargets[@]}"; do
-      if existsinlocal "$pkg"; then
-        localversion="$(pacman -Qs "$pkg" | grep -F "local/$pkg" | cut -d ' ' -f 2)"
-        if ! aurversionisnewer "$pkg" "$localversion"; then
-          echo -e "${COLOR6}warning:$ENDCOLOR $pkg-$localversion is up to date -- reinstalling"
-        fi
-      fi
-    done
-
-    # Echo warning if packages are out of date
-    for pkg in "${aurtargets[@]}" "${aurdepends[@]}"; do
-      if isoutofdate "$pkg"; then
-        echo -e "${COLOR6}warning:$ENDCOLOR $pkg is flagged out of date"
-      fi
-    done
-      
-    # Prompt for aur packages and their dependencies
-    echo
-    if [[ $aurdepends ]]; then
-      num="$((${#aurdepends[@]}+${#aurtargets[@]}))"
-      echo -e "${COLOR6}Aur Targets    ($num):${ENDCOLOR} ${aurdepends[@]} ${aurtargets[@]}"
-    else 
-      echo -e "${COLOR6}Aur Targets    ($((${#aurtargets[@]}))):${ENDCOLOR} ${aurtargets[@]}"
-    fi
-    if [[ $pacmandepends ]]; then
-      IFS=$'\n'
-      pacmandepends=( $(printf "%s\n" "${pacmandepends[@]}" | sort -u) )
-      echo -e "${COLOR6}Pacman Targets (${#pacmandepends[@]}):${ENDCOLOR} ${pacmandepends[@]}"
-    fi
-
-    # Prompt to proceed
-    echo -en "\nProceed with installation? [Y/n] "
-    if ! [[ $noconfirm ]]; then
-      proceed || exit
-    else
-      echo
-    fi
-
-    # Install pacman dependencies
-    if [[ $pacmandepends ]]; then
-      runasroot $outputpacman --noconfirm --asdeps -S -- "${pacmandepends[@]}" || err "Installation failed."
-    fi 
-
-    # Install aur dependencies
-    if [[ $aurdepends ]]; then
-      for dep in "${aurdepends[@]}"; do
-        aurinstall "$dep" "dependency"
-      done
-    fi 
-
-    # Install the aur packages
-    for package in "${aurtargets[@]}"; do
-      scrapeaurdeps "$package"
-      if $pacman -T "${dependencies[@]}" &>/dev/null; then
-        aurinstall "$package" "explicit"
-      else
-        echo "Dependencies for \`$package' are not met, not building..."
-      fi
-    done
+  # First install the explicit pacman packages, let pacman prompt
+  if [[ $pacmanpackages ]]; then
+    runasroot pacman "${PACOPTS[@]}" -S -- "${pacmanpackages[@]}"
   fi
+  if [[ -z $aurtargets ]]; then
+    exit
+  fi
+  # Test if aurpackages are already installed; echo warning if so
+  for pkg in "${aurtargets[@]}"; do
+    if existsinlocal "$pkg"; then
+      localversion="$(pacman -Qs "$pkg" | grep -F "local/$pkg" | cut -d ' ' -f 2)"
+      if ! aurversionisnewer "$pkg" "$localversion"; then
+        echo -e "${COLOR6}warning:$ENDCOLOR $pkg-$localversion is up to date -- reinstalling"
+      fi
+    fi
+  done
+
+  # Echo warning if packages are out of date
+  for pkg in "${aurtargets[@]}" "${aurdepends[@]}"; do
+    if isoutofdate "$pkg"; then
+      echo -e "${COLOR6}warning:$ENDCOLOR $pkg is flagged out of date"
+    fi
+  done
+    
+  # Prompt for aur packages and their dependencies
+  echo
+  if [[ $aurdepends ]]; then
+    num="$((${#aurdepends[@]}+${#aurtargets[@]}))"
+    echo -e "${COLOR6}Aur Targets    ($num):${ENDCOLOR} ${aurdepends[@]} ${aurtargets[@]}"
+  else 
+    echo -e "${COLOR6}Aur Targets    ($((${#aurtargets[@]}))):${ENDCOLOR} ${aurtargets[@]}"
+  fi
+  if [[ $pacmandepends ]]; then
+    IFS=$'\n'
+    pacmandepends=( $(printf "%s\n" "${pacmandepends[@]}" | sort -u) )
+    echo -e "${COLOR6}Pacman Targets (${#pacmandepends[@]}):${ENDCOLOR} ${pacmandepends[@]}"
+  fi
+
+  # Prompt to proceed
+  echo -en "\nProceed with installation? [Y/n] "
+  if ! [[ $noconfirm ]]; then
+    proceed || exit
+  else
+    echo
+  fi
+
+  # Install pacman dependencies
+  if [[ $pacmandepends ]]; then
+    runasroot pacman --noconfirm --asdeps -S -- "${pacmandepends[@]}" || err "Installation failed."
+  fi 
+
+  # Install aur dependencies
+  if [[ $aurdepends ]]; then
+    for dep in "${aurdepends[@]}"; do
+      aurinstall "$dep" "dependency"
+    done
+  fi 
+
+  # Install the aur packages
+  for package in "${aurtargets[@]}"; do
+    scrapeaurdeps "$package"
+    if pacman -T "${dependencies[@]}" &>/dev/null; then
+      aurinstall "$package" "explicit"
+    else
+      echo "Dependencies for \`$package' are not met, not building..."
+    fi
+  done
 }
 
 # proceed with installation prompt
 proceed() {
-  read -r
+  read -n 1
+  echo
   case "$REPLY" in
     'Y'|'y'|'') return 0 ;;
-    *)       return 1 ;;
+    *)          return 1 ;;
   esac
 }
 
@@ -452,6 +433,21 @@ proceed() {
 nap() {
   while (( $(jobs | wc -l) >= 8 )); do
     jobs > /dev/null
+  done
+}
+
+# join three lines into one
+paste3() {
+  i=0
+  while read line
+  do
+    (( i++ ))
+    line="${line:--}"
+    case "$(( $i % 3))" in
+      1) a="$line" ;;
+      2) b="$line" ;;
+      0) echo -e "$a\t$b\t$line" ;;
+    esac
   done
 }
 
@@ -497,13 +493,13 @@ if [[ $option = update ]]; then
   sourcemakepkgconf
   # Pacman update
   if ! [[ $auronly ]]; then
-    runasroot $outputpacman "${PACOPTS[@]}" "$pacmanarg"
+    runasroot pacman "${PACOPTS[@]}" "$pacmanarg"
   fi
 
   # Aur update
   echo -e "${COLOR5}:: ${COLOR1}Synchronizing aur database...${ENDCOLOR}"
   IFS=$'\n'
-  packages=( $($pacman -Qm) )
+  packages=( $(pacman -Qm) )
   newpackages=()
   checkignores=()
   total="${#packages[@]}"
@@ -595,86 +591,59 @@ fi
 if [[ $option = search || $option = searchinstall ]]; then
   # Pacman searching 
   if ! [[ $auronly ]]; then
-    if [[ $option = search ]]; then
-      [[ $quiet ]] && arg='-Ssq' || arg='-Ss'
-      $outputpacman $arg -- "${packageargs[@]}"
+    if [[ $quiet ]]; then
+      results="$(pacman -Ssq -- "${packageargs[@]}")"
     else
-      # Get the pacman output into various arrays and output
-      $pacman -Ss -- "${packageargs[@]}" > "$tmpdir/pacman.search"
-      IFS=$'\n' ; repoline=(  $(grep -Fv '    ' "$tmpdir/pacman.search") )
-      repo=( "${repoline[@]%%/*}" )
-      pacname=( "${repoline[@]##*/}" )
-      pacname=( "${pacname[@]%% *}" )
-      
-      if ! [[ $quiet ]]; then
-        version=( "${repoline[@]#* }" )
-        IFS=$'\a' ; description=( $(sed 's/^[^ ].*/\a/' "$tmpdir/pacman.search") )  
-      fi
-      pactotal="${#pacname[@]}"
-
-      if [[ $quiet ]]; then
-        for ((i=0; i<$pactotal; i++)); do
-          echo "$i ${pacname[$i]}"
-        done
-      else
-        for ((i=0; i<$pactotal; i++)); do
-          echo -ne "$i ${COLOR3}${repo[$i]}/${COLOR1}${pacname[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}${description[$((i+1))]}"
-        done
-        [[ $pacname ]] && echo
-      fi
+      results="$(pacman -Ss -- "${packageargs[@]}")"
+      results="$(sed -r "s|^[^ ][^/]*/|$S${COLOR3}&$S${COLOR1}|" <<< "$results")"
+      results="$(sed -r "s|^([^ ]+) ([^ ]+)(.*)$|\1 $S${COLOR2}\2$S${ENDCOLOR}\3|" <<< "$results")"
     fi
+    if [[ $option = search ]]; then
+      echo -e "$results" | fmt -"$_WIDTH" -s
+    else  # interactive
+      echo -e "$results" | fmt -"$_WIDTH" -s | nl -v 0 -w 1 -s ' ' -b 'p^[^ ]'
+    fi
+    pacname=( $(pacman -Ssq -- "${packageargs[@]}") )
+    pactotal="${#pacname[@]}"
   else
     pactotal=0
   fi
 
   # Aur searching and tmpfile preparation
-  if  [[ ${#packageargs[@]} -eq 1 ]]; then
-    # Fill up the arrays with package information from dump file
-    curl -LfGs --data-urlencode "arg=$packageargs" "$RPCURL=search" | sed -e 's/","/"\n"/g' -e 's/\\//g' > "$tmpdir/$packageargs.search" 
-    parsefile="$tmpdir/$packageargs.search"
-  else
-    curl -LfGs --data-urlencode "arg=$packageargs" "$RPCURL=search" | sed -e 's/{/\n{/g' -e 's/\\//g' > "$tmpdir/$packageargs.search-0"
-    for ((i=1 ; i<${#packageargs[@]} ; i++)); do
-      grep -e "\"Name\":\".*${packageargs[$i]}.*\",\"Version" -e "\"Description\":\".*${packageargs[$i]}.*\",\"LocationID" "${tmpdir}/$packageargs.search-$((i-1))" > "$tmpdir/$packageargs.search-$i"
-    done
-    sed -e 's/","/"\n"/g' -i "$tmpdir/$packageargs.search-$((i-1))"
-    parsefile="$tmpdir/$packageargs.search-$((i-1))"
-  fi
+  for package in "${packageargs[@]}"; do
+    curl -LfGs --data-urlencode "arg=$package" "$RPCURL=search" | \
+    jshon -Q -e results -a -e Name -u -p -e Version -u -p -e Description -u | \
+    paste3 > "$tmpdir/$package.search" &
+  done
+  wait
+  cp "$tmpdir/${packageargs[0]}.search" "$tmpdir/search.results"
+  for ((i=1 ; i<${#packageargs[@]} ; i++)); do
+    grep -xFf "$tmpdir/search.results" "$tmpdir/${packageargs[$i]}.search" > "$tmpdir/search.results-2"
+    mv "$tmpdir/search.results-2" "$tmpdir/search.results"
+  done
 
   # Prepare tmp file and arrays
   IFS=$'\n'
-  aurname=( $(grep -F '"Name":"' "$parsefile" | cut -d '"' -f 4) )
-  version=( $(grep -F '"Version":"' "$parsefile" | cut -d '"' -f 4) )
-  if ! [[ $quiet ]]; then
-    description=( $(grep -F '"Description":"' "$parsefile" | sed -e 's/^"Description":"//' -e 's/"$/ /') )
-  fi
+  aurname=( $(cut -f 1 "$tmpdir/search.results") )
   aurtotal="${#aurname[@]}"
-
+  alltotal="$(($pactotal+$aurtotal))"
   # Echo out the -Ss formatted package information
+
+  IFS=$'\t\n'
   if [[ $option = search ]]; then
     if [[ $quiet ]]; then
-      for ((i=0 ; i<$aurtotal ; i++)); do
-        echo "${aurname[$i]}"
-      done
-    else
-      for ((i=0 ; i<$aurtotal ; i++)); do
-        echo -e "${COLOR3}aur/${COLOR1}${aurname[$i]} ${COLOR2}${version[$i]}${ENDCOLOR}\n    ${description[$i]}"
-      done
+      printf "%s\n" ${aurname[@]}
+    elif [[ -s "$tmpdir/search.results" ]]; then
+      printf "${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR}\n    %s\n" $(cat "$tmpdir/search.results")
     fi
   else
-    alltotal="$(($pactotal+$aurtotal))"
+    # interactive
     if [[ $quiet ]]; then
-      for ((i=$pactotal ; i<$alltotal ; i++)); do
-        elem="$(($i-$pactotal))"
-        echo "$i ${aurname[$elem]}"
-      done
-    else
-      for ((i=$pactotal ; i<$alltotal ; i++)); do
-        elem="$(($i-$pactotal))"
-        echo -e "$i ${COLOR3}aur/${COLOR1}${aurname[$elem]} ${COLOR2}${version[$elem]}${ENDCOLOR}\n    ${description[$elem]}"
-      done
+      nl -v ${pactotal:-0} -w 1 -s ' ' <(cut -f 1 "$tmpdir/search.results")
+    elif [[ -s "$tmpdir/search.results" ]]; then
+      printf "%d ${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR}\n    %s\n" $(nl -v ${pactotal:-0} -w 1 < "$tmpdir/search.results")
     fi
-  fi
+  fi | fmt -"$_WIDTH" -s
 
   # Prompt and install selected numbers
   if [[ $option = searchinstall ]]; then
@@ -708,6 +677,7 @@ if [[ $option = search || $option = searchinstall ]]; then
 
   # Remove the tmpfiles
   rm -f "$tmpdir/*search" &>/dev/null
+  rm -f "$tmpdir/search.result" &>/dev/null
   exit
 fi
 
@@ -717,7 +687,13 @@ if [[ $option = info ]]; then
   sourcemakepkgconf
   for package in "${packageargs[@]}"; do
     if ! [[ $auronly ]] && existsinpacman "$package"; then
-      $outputpacman -Si -- "$package"
+      results="$(pacman -Si -- "$package")"
+      results="$(sed -r "s|^(Repository[^:]*:)(.*)$|\1$S${COLOR3}\2$S${ENDCOLOR}|" <<< "$results")"
+      results="$(sed -r "s|^(Name[^:]*:)(.*)$|\1$S${COLOR1}\2$S${ENDCOLOR}|" <<< "$results")"
+      results="$(sed -r "s|^(Version[^:]*:)(.*)$|\1$S${COLOR2}\2$S${ENDCOLOR}|" <<< "$results")"
+      results="$(sed -r "s|^(URL[^:]*:)(.*)$|\1$S${COLOR4}\2$S${ENDCOLOR}|" <<< "$results")"
+      results="$(sed -r "s|^[^ ][^:]*:|$S${COLOR1}&$S${ENDCOLOR}|" <<< "$results")"
+      echo -e "$results"
       exit
     else # Check to see if it is in the aur
       pkginfo "$package"
