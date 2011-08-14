@@ -436,21 +436,6 @@ nap() {
   done
 }
 
-# join three lines into one
-paste3() {
-  i=0
-  while read line
-  do
-    (( i++ ))
-    line="${line:--}"
-    case "$(( $i % 3))" in
-      1) a="$line" ;;
-      2) b="$line" ;;
-      0) echo -e "$a\t$b\t$line" ;;
-    esac
-  done
-}
-
 # Argument parsing
 [[ $1 ]] || usage
 packageargs=()
@@ -613,7 +598,7 @@ if [[ $option = search || $option = searchinstall ]]; then
   for package in "${packageargs[@]}"; do
     curl -LfGs --data-urlencode "arg=$package" "$RPCURL=search" | \
     jshon -Q -e results -a -e Name -u -p -e Version -u -p -e Description -u | \
-    paste3 > "$tmpdir/$package.search" &
+    sed 's/^$/-/' |  paste -s -d "\t\t\n" > "$tmpdir/$package.search" &
   done
   wait
   cp "$tmpdir/${packageargs[0]}.search" "$tmpdir/search.results"
