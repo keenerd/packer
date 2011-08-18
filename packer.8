@@ -7,7 +7,7 @@
 .\"    Source: Pacman
 .\"  Language: English
 .\"
-.TH "PACKER" "8" "03/27/2010" "Pacman" "Pacman Manual"
+.TH "PACKER" "8" "03/27/2010" "Packer" "Packer Manual"
 .\" -----------------------------------------------------------------
 .\" * set default formatting
 .\" -----------------------------------------------------------------
@@ -205,7 +205,7 @@ Packer uses these settings in /etc/pacman\&.conf:
 IgnorePkg
 .RE
 .sp
-Packer output will be colorized if if pacman\-color is installed\&.
+Packer output will be colorized unless the environmental variable COLOR is set to `NO'.
 .sp
 To manually edit files, packer uses the EDITOR variable\&. If EDITOR is not set then the default editor is vi\&.
 .SH "SEE ALSO"
