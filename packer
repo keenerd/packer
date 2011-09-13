@@ -54,6 +54,7 @@ usage() {
   echo '    --auronly   - only do actions for aur'
   echo '    --devel     - update devel packages during -Su'
   echo '    --skipinteg - when using makepkg, do not check md5s'
+  echo '    --notarball - Don'\''t create a tarball from downloaded AUR packages'
   echo '    -h          - outputs this message'
   exit
 }
@@ -266,8 +267,12 @@ aurinstall() {
     [[ -d $dir ]] && rm -rf $dir
     mkdir -p "$dir"
     cd "$dir"
-    curl -Lfs "$PKGURL/$1/$1.tar.gz" > "$1.tar.gz"
-    tar xf "$1.tar.gz"
+    if (( notarball )); then
+      curl -Lfs "$PKGURL/$1/$1.tar.gz" | tar xz
+    else
+      curl -Lfs "$PKGURL/$1/$1.tar.gz" > "$1.tar.gz"
+      tar xf "$1.tar.gz"
+    fi
     cd "$1"
 
     # customizepkg
@@ -455,6 +460,7 @@ while [[ $1 ]]; do
     '--auronly') auronly='1' ;;
     '--devel') devel='1' ;;
     '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
+    '--notarball') notarball=1 ;;
     '--') shift ; packageargs+=("$@") ; break ;;
     -*) echo "packer: Option \`$1' is not valid." ; exit 5 ;;
     *) packageargs+=("$1") ;;
@@ -567,8 +573,12 @@ if [[ $option = download ]]; then
   done
 
   for package in "${pkglist[@]}"; do
-    curl -Lfs "$PKGURL/$package/$package.tar.gz" > "$package.tar.gz"
-    tar xf "$package.tar.gz" 
+    if (( notarball )); then
+      curl -Lfs "$PKGURL/$package/$package.tar.gz" | tar xz
+    else
+      curl -Lfs "$PKGURL/$package/$package.tar.gz" > "$1.tar.gz"
+      tar xf "$1.tar.gz"
+    fi
   done
 fi
 
