@@ -55,6 +55,8 @@ usage() {
   echo '    --devel     - update devel packages during -Su'
   echo '    --skipinteg - when using makepkg, do not check md5s'
   echo '    --notarball - Don'\''t create a tarball from downloaded AUR packages'
+  echo '    --builddir  - specify build directory'
+  echo '                  (default is /tmp/packerbuild-$UID/$pkgname)'
   echo '    -h          - outputs this message'
   exit
 }
@@ -257,16 +259,16 @@ confirm_edit() {
 
 # Installs packages from aur ($1 is package, $2 is dependency or explicit)
 aurinstall() {
-  dir="${TMPDIR:-/tmp}/packerbuild-$UID/$1"
+  dir="${builddir:-${TMPDIR:-/tmp}/packerbuild-$UID/$1}"
 
   # Prepare the installation directory
   # If there is an old directory and aurversion is not newer, use old directory
-  if . "$dir/$1/PKGBUILD" &>/dev/null && ! aurversionisnewer "$1" "$pkgver-$pkgrel"; then
-    cd "$dir/$1"
+  [[ -d "$dir" ]] || mkdir -p "$dir"
+  cd "$dir"
+  if . "$1/PKGBUILD" &>/dev/null && ! aurversionisnewer "$1" "$pkgver-$pkgrel"; then
+    cd "$1"
   else
-    [[ -d $dir ]] && rm -rf $dir
-    mkdir -p "$dir"
-    cd "$dir"
+    [[ -d "$1" ]] && rm -rf "$1"
     if (( notarball )); then
       curl -Lfs "$PKGURL/$1/$1.tar.gz" | tar xz
     else
@@ -461,6 +463,7 @@ while [[ $1 ]]; do
     '--devel') devel='1' ;;
     '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
     '--notarball') notarball=1 ;;
+    '--builddir') builddir="$2"; shift ;;
     '--') shift ; packageargs+=("$@") ; break ;;
     -*) echo "packer: Option \`$1' is not valid." ; exit 5 ;;
     *) packageargs+=("$1") ;;
@@ -571,6 +574,11 @@ if [[ $option = download ]]; then
       err "Package \`$package' does not exist on aur."
     fi
   done
+
+  if (( ${#builddir} )); then
+    [[ -d $builddir ]] || err "Directory $builddir not found."
+    cd "$builddir"
+  fi
 
   for package in "${pkglist[@]}"; do
     if (( notarball )); then
