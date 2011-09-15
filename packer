@@ -22,7 +22,7 @@ if [[ -t 1 && ! $COLOR = "NO" ]]; then
   COLOR5='\e[1;34m'
   COLOR6='\e[1;33m'
   COLOR7='\e[1;31m'
-  ENDCOLOR='\e[0m' 
+  ENDCOLOR='\e[0m'
   S='\\'
 fi
 _WIDTH="$(stty size | cut -d ' ' -f 2)"
@@ -174,7 +174,7 @@ finddeps() {
 aurbar() {
   # Delete line
   printf "\033[0G"
-  
+
   # Get vars for output
   beginline=" aur"
   beginbar="["
@@ -185,7 +185,7 @@ aurbar() {
   charsbefore="$((${#beginline}+${#1}+${#2}+${#beginbar}+3))"
   spaces="$((51-$charsbefore))"
   barchars="$(($width-51-7))"
-  hashes="$(($barchars*$perc/100))" 
+  hashes="$(($barchars*$perc/100))"
   dashes="$(($barchars-$hashes))"
 
   # Print output
@@ -356,7 +356,7 @@ installhandling() {
       fi
     fi
   done
- 
+
   # First install the explicit pacman packages, let pacman prompt
   if [[ $pacmanpackages ]]; then
     runasroot pacman "${PACOPTS[@]}" -S -- "${pacmanpackages[@]}"
@@ -380,13 +380,13 @@ installhandling() {
       echo -e "${COLOR6}warning:$ENDCOLOR $pkg is flagged out of date"
     fi
   done
-    
+
   # Prompt for aur packages and their dependencies
   echo
   if [[ $aurdepends ]]; then
     num="$((${#aurdepends[@]}+${#aurtargets[@]}))"
     echo -e "${COLOR6}Aur Targets    ($num):${ENDCOLOR} ${aurdepends[@]} ${aurtargets[@]}"
-  else 
+  else
     echo -e "${COLOR6}Aur Targets    ($((${#aurtargets[@]}))):${ENDCOLOR} ${aurtargets[@]}"
   fi
   if [[ $pacmandepends ]]; then
@@ -406,14 +406,14 @@ installhandling() {
   # Install pacman dependencies
   if [[ $pacmandepends ]]; then
     runasroot pacman --noconfirm --asdeps -S -- "${pacmandepends[@]}" || err "Installation failed."
-  fi 
+  fi
 
   # Install aur dependencies
   if [[ $aurdepends ]]; then
     for dep in "${aurdepends[@]}"; do
       aurinstall "$dep" "dependency"
     done
-  fi 
+  fi
 
   # Install the aur packages
   for package in "${aurtargets[@]}"; do
@@ -500,7 +500,7 @@ if [[ $option = update ]]; then
   grep -q '^ *ILoveCandy' "$pacmanconf" && bartype='candy' || bartype='normal'
 
   if [[ $devel ]]; then
-    for ((i=0; i<$total; i++)); do 
+    for ((i=0; i<$total; i++)); do
       aurbar "$((i+1))" "$total" "$bartype"
       pkg="${packages[i]%% *}"
       if isignored "$pkg"; then
@@ -511,7 +511,7 @@ if [[ $option = update ]]; then
       nap
     done
     wait
-    for ((i=0; i<$total; i++)); do 
+    for ((i=0; i<$total; i++)); do
       pkg="${packages[i]%% *}"
       ver="${packages[i]##* }"
       if [[ ! -s "$tmpdir/$pkg.PKGBUILD" ]]; then
@@ -524,12 +524,12 @@ if [[ $option = update ]]; then
       . "$tmpdir/$pkg.PKGBUILD"
       if [[ "$(LC_ALL=C vercmp "$pkgver-$pkgrel" "$ver")" -gt 0 ]]; then
         newpackages+=("$pkg")
-      elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
+      elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then
         newpackages+=("$pkg")
       fi
     done
   else
-    for ((i=0; i<$total; i++)); do 
+    for ((i=0; i<$total; i++)); do
       aurbar "$((i+1))" "$total" "$bartype"
       pkg="${packages[i]%% *}"
       rpcinfo "$pkg" &
@@ -592,7 +592,7 @@ fi
 
 # Search (-Ss) handling
 if [[ $option = search || $option = searchinstall ]]; then
-  # Pacman searching 
+  # Pacman searching
   if ! [[ $auronly ]]; then
     if [[ $quiet ]]; then
       results="$(pacman -Ssq -- "${packageargs[@]}")"
@@ -662,7 +662,7 @@ if [[ $option = search || $option = searchinstall ]]; then
     echo -e "${COLOR2}Type numbers to install. Separate each number with a space.${ENDCOLOR}"
     echo -ne "${COLOR2}Numbers: ${ENDCOLOR}"
     read -r
-    
+
     # Parse answer
     if [[ $REPLY ]]; then
       IFS=' '
@@ -675,7 +675,7 @@ if [[ $option = search || $option = searchinstall ]]; then
       done
     fi
 
-    # Call installhandling to take care of the packages chosen 
+    # Call installhandling to take care of the packages chosen
     installhandling "${pkglist[@]}"
   fi
 
@@ -725,7 +725,7 @@ if [[ $option = info ]]; then
           if [[ $i = 0 ]]; then
             echo "${optdepends[$i]}"
           else
-            echo -e "                 ${optdepends[$i]}" 
+            echo -e "                 ${optdepends[$i]}"
           fi
         done
       fi
