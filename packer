@@ -96,7 +96,7 @@ isignored() {
 # Tests whether $1 exists on the aur
 existsinaur() {
   rpcinfo "$1"
-  ! grep -Fq ':"No result found"' "$tmpdir/$1.info"
+  ! grep -Fq ':"No results found"' "$tmpdir/$1.info"
 }
 
 # Tests whether $1 exists in pacman
