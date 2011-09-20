@@ -14,6 +14,8 @@ pacmanconf='/etc/pacman.conf'
 RPCURL="https://aur.archlinux.org/rpc.php?type"
 PKGURL="https://aur.archlinux.org/packages"
 
+MAKECHROOTPKGOPTS=(-c)
+
 if [[ -t 1 && ! $COLOR = "NO" ]]; then
   COLOR1='\e[1;39m'
   COLOR2='\e[1;32m'
@@ -57,6 +59,7 @@ usage() {
   echo '    --notarball - Don'\''t create a tarball from downloaded AUR packages'
   echo '    --builddir  - specify build directory'
   echo '                  (default is /tmp/packerbuild-$UID/$pkgname)'
+  echo '    --archroot  - specify archroot directory and use makechrootpkg'
   echo '    -h          - outputs this message'
   exit
 }
@@ -296,10 +299,14 @@ aurinstall() {
   confirm_edit "${COLOR6}Edit $install with \$EDITOR? [Y/n]${ENDCOLOR} " "$install"
 
   # Installation (makepkg and pacman)
-  if [[ $UID -eq 0 ]]; then
-    makepkg $MAKEPKGOPTS --asroot -f
+  if (( ${#archroot} )); then
+    runasroot makechrootpkg "${MAKECHROOTPKGOPTS[@]}" -r "$archroot" -- $MAKEPKGOPTS
   else
-    makepkg $MAKEPKGOPTS -f
+    if [[ $UID -eq 0 ]]; then
+      makepkg $MAKEPKGOPTS --asroot -f
+    else
+      makepkg $MAKEPKGOPTS -f
+    fi
   fi
 
   [[ $? -ne 0 ]] && echo "The build failed." && return 1
@@ -464,6 +471,7 @@ while [[ $1 ]]; do
     '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
     '--notarball') notarball=1 ;;
     '--builddir') builddir="$2"; shift ;;
+    '--archroot') archroot="$2"; shift ;;
     '--') shift ; packageargs+=("$@") ; break ;;
     -*) echo "packer: Option \`$1' is not valid." ; exit 5 ;;
     *) packageargs+=("$1") ;;
