@@ -22,7 +22,7 @@ if [[ -t 1 && ! $COLOR = "NO" ]]; then
   COLOR5='\e[1;34m'
   COLOR6='\e[1;33m'
   COLOR7='\e[1;31m'
-  ENDCOLOR='\e[0m' 
+  ENDCOLOR='\e[0m'
   S='\\'
 fi
 _WIDTH="$(stty size | cut -d ' ' -f 2)"
@@ -45,7 +45,9 @@ usage() {
   echo '    -Syu|-Su    - updates all packages, also takes -uu and -yy options'
   echo '    -Ss|-Ssq    - searches for package'
   echo '    -Si         - outputs info for package'
-  echo '    -G          - download and extract aur tarball only'
+  echo '    -U          - installs local package'
+  echo '    -G          - downloads and extracts aur tarball only'
+  echo '    -R          - uninstalls package'
   echo
   echo '    --quiet     - only output package name for searches'
   echo '    --ignore    - takes a comma-separated list of packages to ignore'
@@ -171,7 +173,7 @@ finddeps() {
 aurbar() {
   # Delete line
   printf "\033[0G"
-  
+
   # Get vars for output
   beginline=" aur"
   beginbar="["
@@ -349,7 +351,7 @@ installhandling() {
       fi
     fi
   done
- 
+
   # First install the explicit pacman packages, let pacman prompt
   if [[ $pacmanpackages ]]; then
     runasroot pacman "${PACOPTS[@]}" -S -- "${pacmanpackages[@]}"
@@ -373,7 +375,7 @@ installhandling() {
       echo -e "${COLOR6}warning:$ENDCOLOR $pkg is flagged out of date"
     fi
   done
-    
+
   # Prompt for aur packages and their dependencies
   echo
   if [[ $aurdepends ]]; then
@@ -406,7 +408,7 @@ installhandling() {
     for dep in "${aurdepends[@]}"; do
       aurinstall "$dep" "dependency"
     done
-  fi 
+  fi
 
   # Install the aur packages
   for package in "${aurtargets[@]}"; do
@@ -442,11 +444,18 @@ packageargs=()
 while [[ $1 ]]; do
   case "$1" in
     '-S') option=install ;;
+    -S*d*) option=install ; pacmanarg="$1" ;;
     '-Ss') option=search ;;
     '-Ssq'|'-Sqs') option=search ; quiet='1' ;;
     '-Si') option=info ;;
     -S*u*) option=update ; pacmanarg="$1" ;;
+    '-U') option=localinstall ;;
+    -U*d*) option=localinstall ; pacmanarg="$1" ;;
     '-G') option=download ;;
+    '-R') option=uninstall ;;
+    -R*n*) option=uninstall ; pacmanarg="$1" ;;
+    -R*s*) option=uninstall ; pacmanarg="$1" ;;
+    -R*c*) option=uninstall ; pacmanarg="$1" ;;
     '-h'|'--help') usage ;;
     '--quiet') quiet='1' ;;
     '--ignore') ignorearg="$2" ; PACOPTS+=("--ignore" "$2") ; shift ;;
@@ -469,6 +478,16 @@ done
 # Install (-S) handling
 if [[ $option = install ]]; then
   installhandling "${packageargs[@]}"
+  exit
+fi
+
+# Local install (-U) handling
+if [[ $option = localinstall ]]; then
+  for package in "${packageargs[@]}"; do
+    pacmanpackages+=("$package")
+  done
+
+  runasroot pacman "${PACOPTS[@]}" "${pacmanarg:--U}" -- "${pacmanpackages[@]}"
   exit
 fi
 
@@ -644,7 +663,7 @@ if [[ $option = search || $option = searchinstall ]]; then
     echo -e "${COLOR2}Type numbers to install. Separate each number with a space.${ENDCOLOR}"
     echo -ne "${COLOR2}Numbers: ${ENDCOLOR}"
     read -r
-    
+
     # Parse answer
     if [[ $REPLY ]]; then
       IFS=' '
@@ -719,4 +738,14 @@ if [[ $option = info ]]; then
       echo
     fi
   done
+fi
+
+# Uninstall (-R) handling
+if [[ $option = uninstall ]]; then
+  for package in "${packageargs[@]}"; do
+    pacmanpackages+=("$package")
+  done
+
+  runasroot pacman "${PACOPTS[@]}" "${pacmanarg:--R}" -- "${pacmanpackages[@]}"
+  exit
 fi
