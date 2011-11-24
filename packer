@@ -597,8 +597,8 @@ if [[ $option = search || $option = searchinstall ]]; then
   # Aur searching and tmpfile preparation
   for package in "${packageargs[@]}"; do
     curl -LfGs --data-urlencode "arg=$package" "$RPCURL=search" | \
-    jshon -Q -e results -a -e Name -u -p -e Version -u -p -e Description -u | \
-    sed 's/^$/-/' |  paste -s -d "\t\t\n" > "$tmpdir/$package.search" &
+    jshon -Q -e results -a -e Name -u -p -e Version -u -p -e NumVotes -u -p -e Description -u | \
+    sed 's/^$/-/' |  paste -s -d "\t\t\t\n" | sort -nr -k 3 > "$tmpdir/$package.search" &
   done
   wait
   cp "$tmpdir/${packageargs[0]}.search" "$tmpdir/search.results"
@@ -620,14 +620,14 @@ if [[ $option = search || $option = searchinstall ]]; then
     if [[ $quiet ]]; then
       printf "%s\n" ${aurname[@]}
     elif [[ -s "$tmpdir/search.results" ]]; then
-      printf "${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR}\n    %s\n" $(cat "$tmpdir/search.results")
+      printf "${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(cat "$tmpdir/search.results")
     fi
   else
     # interactive
     if [[ $quiet ]]; then
       nl -v ${pactotal:-0} -w 1 -s ' ' <(cut -f 1 "$tmpdir/search.results")
     elif [[ -s "$tmpdir/search.results" ]]; then
-      printf "%d ${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR}\n    %s\n" $(nl -v ${pactotal:-0} -w 1 < "$tmpdir/search.results")
+      printf "%d ${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(nl -v ${pactotal:-0} -w 1 < "$tmpdir/search.results")
     fi
   fi | fmt -"$_WIDTH" -s
 
