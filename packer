@@ -414,7 +414,7 @@ installhandling() {
     if pacman -T "${dependencies[@]}" &>/dev/null; then
       aurinstall "$package" "explicit"
     else
-      echo "Dependencies for \`$package' are not met, not building..."
+      err "Dependencies for \`$package' are not met, not building..."
     fi
   done
 }
