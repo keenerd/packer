@@ -208,6 +208,8 @@ IgnorePkg
 Packer output will be colorized unless the environmental variable COLOR is set to `NO'.
 .sp
 To manually edit files, packer uses the EDITOR variable\&. If EDITOR is not set then the default editor is vi\&.
+.sp
+Packages are built in the TMPDIR path\&. If the TMPDIR variable is not set then the default path is /tmp
 .SH "SEE ALSO"
 .sp
 \fBpacman\fR(8)
