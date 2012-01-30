@@ -54,6 +54,7 @@ usage() {
   echo '    --auronly   - only do actions for aur'
   echo '    --devel     - update devel packages during -Su'
   echo '    --skipinteg - when using makepkg, do not check md5s'
+  echo '    --repo      - specify a local repository to update'
   echo '    -h          - outputs this message'
   exit
 }
@@ -287,15 +288,19 @@ aurinstall() {
   . PKGBUILD
   confirm_edit "${COLOR6}Edit $install with \$EDITOR? [Y/n]${ENDCOLOR} " "$install"
 
-  # Installation (makepkg and pacman)
+  # Build
   if [[ $UID -eq 0 ]]; then
     makepkg $MAKEPKGOPTS --asroot -f
   else
     makepkg $MAKEPKGOPTS -f
   fi
-
   [[ $? -ne 0 ]] && echo "The build failed." && return 1
-  if  [[ $2 = dependency ]]; then
+
+  # Install
+  if [[ $repofile ]]; then
+    cp -t "$(dirname "$repofile")" $pkgname-*$PKGEXT
+    repo-add "$repofile" $pkgname-*$PKGEXT
+  elif  [[ $2 = dependency ]]; then
     runasroot pacman ${PACOPTS[@]} --asdeps -U $pkgname-*$PKGEXT
   elif [[ $2 = explicit ]]; then
     runasroot pacman ${PACOPTS[@]} -U $pkgname-*$PKGEXT
@@ -357,14 +362,16 @@ installhandling() {
     exit
   fi
   # Test if aurpackages are already installed; echo warning if so
-  for pkg in "${aurtargets[@]}"; do
-    if existsinlocal "$pkg"; then
-      localversion="$(pacman -Qs "$pkg" | grep -F "local/$pkg" | cut -d ' ' -f 2)"
-      if ! aurversionisnewer "$pkg" "$localversion"; then
-        echo -e "${COLOR6}warning:$ENDCOLOR $pkg-$localversion is up to date -- reinstalling"
+  if ! [[ $repofile ]]; then
+    for pkg in "${aurtargets[@]}"; do
+      if existsinlocal "$pkg"; then
+        localversion="$(pacman -Qs "$pkg" | grep -F "local/$pkg" | cut -d ' ' -f 2)"
+        if ! aurversionisnewer "$pkg" "$localversion"; then
+          echo -e "${COLOR6}warning:$ENDCOLOR $pkg-$localversion is up to date -- reinstalling"
+        fi
       fi
-    fi
-  done
+    done
+  fi
 
   # Echo warning if packages are out of date
   for pkg in "${aurtargets[@]}" "${aurdepends[@]}"; do
@@ -454,6 +461,7 @@ while [[ $1 ]]; do
     '--auronly') auronly='1' ;;
     '--devel') devel='1' ;;
     '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
+    '--repo') repofile=$(readlink -m "$2") ; auronly='1' ; shift ;;
     '--') shift ; packageargs+=("$@") ; break ;;
     -*) echo "packer: Option \`$1' is not valid." ; exit 5 ;;
     *) packageargs+=("$1") ;;
@@ -483,7 +491,17 @@ if [[ $option = update ]]; then
   # Aur update
   echo -e "${COLOR5}:: ${COLOR1}Synchronizing aur database...${ENDCOLOR}"
   IFS=$'\n'
-  packages=( $(pacman -Qm) )
+  packages=()
+  if [[ $repofile ]]; then
+    repodescs=( $(tar tzf $repofile | grep -e "/desc$") )
+    for repodesc in "${repodescs[@]}"; do
+      pkg=$(tar xzOf "$repofile" "$repodesc" | awk '/^%NAME%$/ { getline; print $0 }')
+      ver=$(tar xzOf "$repofile" "$repodesc" | awk '/^%VERSION%$/ { getline; print $0 }')
+      packages+=( "$pkg $ver" )
+    done
+  else
+    packages+=( $(pacman -Qm) )
+  fi
   newpackages=()
   checkignores=()
   total="${#packages[@]}"
