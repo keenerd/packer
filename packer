@@ -624,7 +624,7 @@ if [[ $option = search || $option = searchinstall ]]; then
   else
     # interactive
     if [[ $quiet ]]; then
-      nl -v ${pactotal:-0} -w 1 -s ' ' <(cut -f 1 "$tmpdir/search.results")
+      nl -v ${pactotal:-0} -w 1 -s ' ' < $(cut -f 1 "$tmpdir/search.results")
     elif [[ -s "$tmpdir/search.results" ]]; then
       printf "%d ${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(nl -v ${pactotal:-0} -w 1 < "$tmpdir/search.results")
     fi
