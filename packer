@@ -7,9 +7,6 @@ tmpdir="${TMPDIR:-/tmp}/packertmp-$UID"
 rm -rf "$tmpdir" &>/dev/null
 mkdir -p "$tmpdir"
 
-# save current dir for built packages
-outdir=$(pwd)
-
 makepkgconf='/etc/makepkg.conf'
 usermakepkgconf="$HOME/.makepkg.conf"
 pacmanconf='/etc/pacman.conf'
@@ -57,8 +54,7 @@ usage() {
   echo '    --auronly   - only do actions for aur'
   echo '    --devel     - update devel packages during -Su'
   echo '    --skipinteg - when using makepkg, do not check md5s'
-  echo '    --noinstall - build but do not install any aur packages'
-  echo '    --repo      - takes the filename of a local repository to update'
+  echo '    --repo      - specify a local repository to update'
   echo '    -h          - outputs this message'
   exit
 }
@@ -301,9 +297,7 @@ aurinstall() {
   [[ $? -ne 0 ]] && echo "The build failed." && return 1
 
   # Install
-  if [[ $noinstall ]]; then
-    cp $pkgname-*$PKGEXT "$outdir"
-  elif [[ $repofile ]]; then
+  if [[ $repofile ]]; then
     repo-add "$repofile" $pkgname-*$PKGEXT
     cp $pkgname-*$PKGEXT "$(dirname "$repofile")"
   elif  [[ $2 = dependency ]]; then
@@ -414,7 +408,7 @@ installhandling() {
   fi 
 
   # Install aur dependencies
-  if [[ $aurdepends && ! $noinstall ]]; then
+  if [[ $aurdepends ]]; then
     for dep in "${aurdepends[@]}"; do
       aurinstall "$dep" "dependency"
     done
@@ -467,7 +461,6 @@ while [[ $1 ]]; do
     '--auronly') auronly='1' ;;
     '--devel') devel='1' ;;
     '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
-    '--noinstall') noinstall='1' ;;
     '--repo') repofile=$(readlink -m "$2") ; auronly='1' ; shift ;;
     '--') shift ; packageargs+=("$@") ; break ;;
     -*) echo "packer: Option \`$1' is not valid." ; exit 5 ;;
