@@ -305,7 +305,7 @@ aurinstall() {
     cp $pkgname-*$PKGEXT "$outdir"
   elif [[ $repofile ]]; then
     repo-add "$repofile" $pkgname-*$PKGEXT
-    cp $pkgname-*$PKGEXT "$(dirname '$repofile')"
+    cp $pkgname-*$PKGEXT "$(dirname "$repofile")"
   elif  [[ $2 = dependency ]]; then
     runasroot pacman ${PACOPTS[@]} --asdeps -U $pkgname-*$PKGEXT
   elif [[ $2 = explicit ]]; then
@@ -468,7 +468,7 @@ while [[ $1 ]]; do
     '--devel') devel='1' ;;
     '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
     '--noinstall') noinstall='1' ;;
-    '--repo') repofile=$(readlink -m "$2") ; shift ;;
+    '--repo') repofile=$(readlink -m "$2") ; auronly='1' ; shift ;;
     '--') shift ; packageargs+=("$@") ; break ;;
     -*) echo "packer: Option \`$1' is not valid." ; exit 5 ;;
     *) packageargs+=("$1") ;;
