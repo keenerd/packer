@@ -7,6 +7,9 @@ tmpdir="${TMPDIR:-/tmp}/packertmp-$UID"
 rm -rf "$tmpdir" &>/dev/null
 mkdir -p "$tmpdir"
 
+# save current dir for built packages
+outdir=$(pwd)
+
 makepkgconf='/etc/makepkg.conf'
 usermakepkgconf="$HOME/.makepkg.conf"
 pacmanconf='/etc/pacman.conf'
@@ -54,6 +57,8 @@ usage() {
   echo '    --auronly   - only do actions for aur'
   echo '    --devel     - update devel packages during -Su'
   echo '    --skipinteg - when using makepkg, do not check md5s'
+  echo '    --noinstall - build but do not install any aur packages'
+  echo '    --repo      - takes the filename of a local repository to update'
   echo '    -h          - outputs this message'
   exit
 }
@@ -287,15 +292,20 @@ aurinstall() {
   . PKGBUILD
   confirm_edit "${COLOR6}Edit $install with \$EDITOR? [Y/n]${ENDCOLOR} " "$install"
 
-  # Installation (makepkg and pacman)
+  # Build
   if [[ $UID -eq 0 ]]; then
     makepkg $MAKEPKGOPTS --asroot -f
   else
     makepkg $MAKEPKGOPTS -f
   fi
-
   [[ $? -ne 0 ]] && echo "The build failed." && return 1
-  if  [[ $2 = dependency ]]; then
+
+  # Install
+  if [[ $noinstall ]]; then
+    cp $pkgname-*$PKGEXT "$outdir"
+  elif [[ $repofile ]]; then
+    repo-add "$repofile" $pkgname-*$PKGEXT
+  elif  [[ $2 = dependency ]]; then
     runasroot pacman ${PACOPTS[@]} --asdeps -U $pkgname-*$PKGEXT
   elif [[ $2 = explicit ]]; then
     runasroot pacman ${PACOPTS[@]} -U $pkgname-*$PKGEXT
@@ -401,7 +411,7 @@ installhandling() {
   fi 
 
   # Install aur dependencies
-  if [[ $aurdepends ]]; then
+  if [[ $aurdepends && ! $noinstall ]]; then
     for dep in "${aurdepends[@]}"; do
       aurinstall "$dep" "dependency"
     done
@@ -454,6 +464,8 @@ while [[ $1 ]]; do
     '--auronly') auronly='1' ;;
     '--devel') devel='1' ;;
     '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
+    '--noinstall') noinstall='1' ;;
+    '--repo') repofile=$(readlink -m "$2") ; shift ;;
     '--') shift ; packageargs+=("$@") ; break ;;
     -*) echo "packer: Option \`$1' is not valid." ; exit 5 ;;
     *) packageargs+=("$1") ;;
@@ -483,7 +495,17 @@ if [[ $option = update ]]; then
   # Aur update
   echo -e "${COLOR5}:: ${COLOR1}Synchronizing aur database...${ENDCOLOR}"
   IFS=$'\n'
-  packages=( $(pacman -Qm) )
+  packages=()
+  if [[ $repofile ]]; then
+    repodescs=( $(tar tzf $repofile | grep -e "/desc$") )
+    for repodesc in "${repodescs[@]}"; do
+      pkg=$(tar xzOf "$repofile" "$repodesc" | awk '/^%NAME%$/ { getline; print $0 }')
+      ver=$(tar xzOf "$repofile" "$repodesc" | awk '/^%VERSION%$/ { getline; print $0 }')
+      packages+=( "$pkg $ver" )
+    done
+  else
+    packages+=( $(pacman -Qm) )
+  fi
   newpackages=()
   checkignores=()
   total="${#packages[@]}"
