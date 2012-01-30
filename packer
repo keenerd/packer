@@ -298,8 +298,8 @@ aurinstall() {
 
   # Install
   if [[ $repofile ]]; then
+    cp -t "$(dirname "$repofile")" $pkgname-*$PKGEXT
     repo-add "$repofile" $pkgname-*$PKGEXT
-    cp $pkgname-*$PKGEXT "$(dirname "$repofile")"
   elif  [[ $2 = dependency ]]; then
     runasroot pacman ${PACOPTS[@]} --asdeps -U $pkgname-*$PKGEXT
   elif [[ $2 = explicit ]]; then
