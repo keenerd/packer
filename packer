@@ -375,7 +375,7 @@ installhandling() {
       echo -e "${COLOR6}warning:$ENDCOLOR $pkg is flagged out of date"
     fi
   done
-    
+
   # Prompt for aur packages and their dependencies
   echo
   if [[ $aurdepends ]]; then
@@ -653,7 +653,7 @@ if [[ $option = search || $option = searchinstall ]]; then
     echo -e "${COLOR2}Type numbers to install. Separate each number with a space.${ENDCOLOR}"
     echo -ne "${COLOR2}Numbers: ${ENDCOLOR}"
     read -r
-    
+
     # Parse answer
     if [[ $REPLY ]]; then
       IFS=' '
@@ -734,3 +734,5 @@ if [[ $option = info ]]; then
     fi
   done
 fi
+
+# vim: ts=2 sts=2 sw=2 et:
