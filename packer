@@ -443,11 +443,18 @@ nap() {
 packageargs=()
 while [[ $1 ]]; do
   case "$1" in
+    # local (query) options
+    '-Qs') mode=query ; option=search ;;
+    '-Qsq'|'-Qqs') mode=query ; option=search ; quiet='1' ;;
+    '-Q'|'-Qi') mode=query ; option=info ;;
+
+    # remote (sync) options
     '-S') option=install ;;
-    '-Ss') option=search ;;
-    '-Ssq'|'-Sqs') option=search ; quiet='1' ;;
-    '-Si') option=info ;;
+    '-Ss') mode=sync ; option=search ;;
+    '-Ssq'|'-Sqs') mode=sync ; option=search ; quiet='1' ;;
+    '-Si') mode=sync ; option=info ;;
     -S*u*) option=update ; pacmanarg="$1" ;;
+
     '-G') option=download ;;
     '-h'|'--help') usage ;;
     '--quiet') quiet='1' ;;
