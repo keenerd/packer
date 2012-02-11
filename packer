@@ -583,97 +583,111 @@ fi
 
 # Search (-Ss) handling
 if [[ $option = search || $option = searchinstall ]]; then
-  # Pacman searching 
-  if ! [[ $auronly ]]; then
+  # query installed packages
+  if [[ $mode = query ]]; then
     if [[ $quiet ]]; then
-      results="$(pacman -Ssq -- "${packageargs[@]}")"
+      results="$(pacman -Qsq -- "${packageargs[@]}")"
     else
-      results="$(pacman -Ss -- "${packageargs[@]}")"
+      results="$(pacman -Qs -- "${packageargs[@]}")"
       results="$(sed -r "s|^[^ ][^/]*/|$S${COLOR3}&$S${COLOR1}|" <<< "$results")"
       results="$(sed -r "s|^([^ ]+) ([^ ]+)(.*)$|\1 $S${COLOR2}\2$S${ENDCOLOR}\3|" <<< "$results")"
     fi
+    # print results and exit
+    echo -e "$results" | fmt -"$_WIDTH" -s
+    exit
+  else
+    # Pacman searching 
+    if ! [[ $auronly ]]; then
+      if [[ $quiet ]]; then
+        results="$(pacman -Ssq -- "${packageargs[@]}")"
+      else
+        results="$(pacman -Ss -- "${packageargs[@]}")"
+        results="$(sed -r "s|^[^ ][^/]*/|$S${COLOR3}&$S${COLOR1}|" <<< "$results")"
+        results="$(sed -r "s|^([^ ]+) ([^ ]+)(.*)$|\1 $S${COLOR2}\2$S${ENDCOLOR}\3|" <<< "$results")"
+      fi
+      if [[ $option = search ]]; then
+        echo -e "$results" | fmt -"$_WIDTH" -s
+      else  # interactive
+        echo -e "$results" | fmt -"$_WIDTH" -s | nl -v 0 -w 1 -s ' ' -b 'p^[^ ]'
+      fi | sed '/^$/d'
+      pacname=( $(pacman -Ssq -- "${packageargs[@]}") )
+      pactotal="${#pacname[@]}"
+    else
+      pactotal=0
+    fi
+
+    # Aur searching and tmpfile preparation
+    for package in "${packageargs[@]}"; do
+      curl -LfGs --data-urlencode "arg=$package" "$RPCURL=search" | \
+      jshon -Q -e results -a -e Name -u -p -e Version -u -p -e NumVotes -u -p -e Description -u | \
+      sed 's/^$/-/' |  paste -s -d "\t\t\t\n" | sort -nr -k 3 > "$tmpdir/$package.search" &
+    done
+    wait
+    cp "$tmpdir/${packageargs[0]}.search" "$tmpdir/search.results"
+    for ((i=1 ; i<${#packageargs[@]} ; i++)); do
+      grep -xFf "$tmpdir/search.results" "$tmpdir/${packageargs[$i]}.search" > "$tmpdir/search.results-2"
+      mv "$tmpdir/search.results-2" "$tmpdir/search.results"
+    done
+    sed -i '/^$/d' "$tmpdir/search.results"
+
+    # Prepare tmp file and arrays
+    IFS=$'\n'
+    aurname=( $(cut -f 1 "$tmpdir/search.results") )
+    aurtotal="${#aurname[@]}"
+    alltotal="$(($pactotal+$aurtotal))"
+    # Echo out the -Ss formatted package information
+
+    IFS=$'\t\n'
     if [[ $option = search ]]; then
-      echo -e "$results" | fmt -"$_WIDTH" -s
-    else  # interactive
-      echo -e "$results" | fmt -"$_WIDTH" -s | nl -v 0 -w 1 -s ' ' -b 'p^[^ ]'
-    fi | sed '/^$/d'
-    pacname=( $(pacman -Ssq -- "${packageargs[@]}") )
-    pactotal="${#pacname[@]}"
-  else
-    pactotal=0
+      if [[ $quiet ]]; then
+        printf "%s\n" ${aurname[@]}
+      elif [[ -s "$tmpdir/search.results" ]]; then
+        printf "${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(cat "$tmpdir/search.results")
+      fi
+    else
+      # interactive
+      if [[ $quiet ]]; then
+        nl -v ${pactotal:-0} -w 1 -s ' ' < $(cut -f 1 "$tmpdir/search.results")
+      elif [[ -s "$tmpdir/search.results" ]]; then
+        printf "%d ${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(nl -v ${pactotal:-0} -w 1 < "$tmpdir/search.results")
+      fi
+    fi | fmt -"$_WIDTH" -s
+
+    # Prompt and install selected numbers
+    if [[ $option = searchinstall ]]; then
+      pkglist=()
+      allpackages=( "${pacname[@]}" "${aurname[@]}" )
+
+      # Exit if there are no matches
+      [[ $allpackages ]] || exit
+
+      # Prompt for numbers
+      echo
+      echo -e "${COLOR2}Type numbers to install. Separate each number with a space.${ENDCOLOR}"
+      echo -ne "${COLOR2}Numbers: ${ENDCOLOR}"
+      read -r
+
+      # Parse answer
+      if [[ $REPLY ]]; then
+        IFS=' '
+        for num in $REPLY; do
+          if [[ $num -lt $alltotal ]]; then
+            pkglist+=("${allpackages[$num]}")
+          else
+            err "Number \`$num' is not assigned to any of the packages."
+          fi
+        done
+      fi
+
+      # Call installhandling to take care of the packages chosen 
+      installhandling "${pkglist[@]}"
+    fi
+
+    # Remove the tmpfiles
+    rm -f "$tmpdir/*search" &>/dev/null
+    rm -f "$tmpdir/search.result" &>/dev/null
+    exit
   fi
-
-  # Aur searching and tmpfile preparation
-  for package in "${packageargs[@]}"; do
-    curl -LfGs --data-urlencode "arg=$package" "$RPCURL=search" | \
-    jshon -Q -e results -a -e Name -u -p -e Version -u -p -e NumVotes -u -p -e Description -u | \
-    sed 's/^$/-/' |  paste -s -d "\t\t\t\n" | sort -nr -k 3 > "$tmpdir/$package.search" &
-  done
-  wait
-  cp "$tmpdir/${packageargs[0]}.search" "$tmpdir/search.results"
-  for ((i=1 ; i<${#packageargs[@]} ; i++)); do
-    grep -xFf "$tmpdir/search.results" "$tmpdir/${packageargs[$i]}.search" > "$tmpdir/search.results-2"
-    mv "$tmpdir/search.results-2" "$tmpdir/search.results"
-  done
-  sed -i '/^$/d' "$tmpdir/search.results"
-
-  # Prepare tmp file and arrays
-  IFS=$'\n'
-  aurname=( $(cut -f 1 "$tmpdir/search.results") )
-  aurtotal="${#aurname[@]}"
-  alltotal="$(($pactotal+$aurtotal))"
-  # Echo out the -Ss formatted package information
-
-  IFS=$'\t\n'
-  if [[ $option = search ]]; then
-    if [[ $quiet ]]; then
-      printf "%s\n" ${aurname[@]}
-    elif [[ -s "$tmpdir/search.results" ]]; then
-      printf "${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(cat "$tmpdir/search.results")
-    fi
-  else
-    # interactive
-    if [[ $quiet ]]; then
-      nl -v ${pactotal:-0} -w 1 -s ' ' < $(cut -f 1 "$tmpdir/search.results")
-    elif [[ -s "$tmpdir/search.results" ]]; then
-      printf "%d ${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(nl -v ${pactotal:-0} -w 1 < "$tmpdir/search.results")
-    fi
-  fi | fmt -"$_WIDTH" -s
-
-  # Prompt and install selected numbers
-  if [[ $option = searchinstall ]]; then
-    pkglist=()
-    allpackages=( "${pacname[@]}" "${aurname[@]}" )
-
-    # Exit if there are no matches
-    [[ $allpackages ]] || exit
-
-    # Prompt for numbers
-    echo
-    echo -e "${COLOR2}Type numbers to install. Separate each number with a space.${ENDCOLOR}"
-    echo -ne "${COLOR2}Numbers: ${ENDCOLOR}"
-    read -r
-
-    # Parse answer
-    if [[ $REPLY ]]; then
-      IFS=' '
-      for num in $REPLY; do
-        if [[ $num -lt $alltotal ]]; then
-          pkglist+=("${allpackages[$num]}")
-        else
-          err "Number \`$num' is not assigned to any of the packages."
-        fi
-      done
-    fi
-
-    # Call installhandling to take care of the packages chosen 
-    installhandling "${pkglist[@]}"
-  fi
-
-  # Remove the tmpfiles
-  rm -f "$tmpdir/*search" &>/dev/null
-  rm -f "$tmpdir/search.result" &>/dev/null
-  exit
 fi
 
 # Info (-Si) handling
