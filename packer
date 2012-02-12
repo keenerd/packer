@@ -695,7 +695,6 @@ fi
 if [[ $option = info ]]; then
   if [[ $mode = query ]]; then
     results="$(pacman -Qi -- "${packageargs[@]}")"
-    results="$(sed -r "s|^(Repository[^:]*:)(.*)$|\1$S${COLOR3}\2$S${ENDCOLOR}|" <<< "$results")"
     results="$(sed -r "s|^(Name[^:]*:)(.*)$|\1$S${COLOR1}\2$S${ENDCOLOR}|" <<< "$results")"
     results="$(sed -r "s|^(Version[^:]*:)(.*)$|\1$S${COLOR2}\2$S${ENDCOLOR}|" <<< "$results")"
     results="$(sed -r "s|^(URL[^:]*:)(.*)$|\1$S${COLOR4}\2$S${ENDCOLOR}|" <<< "$results")"
