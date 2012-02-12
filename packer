@@ -771,8 +771,14 @@ fi
 
 # Info -Q handling
 if [[ $option = queryver ]]; then
-  results="$(pacman -Q -- "${packageargs[@]}")"
-  results="$(sed -r "s|^(.* )(.*)$|\1$S${COLOR2}\2$S${ENDCOLOR}|" <<< "$results")"
-  echo -e "$results"
+    for package in "${packageargs[@]}"; do
+      if ! existslocal "$package"; then
+        echo -e "${COLOR6}warning:${ENDCOLOR} package '$package' was not found, skipping.."
+      else
+        results="$(pacman -Q -- "$package")"
+        results="$(sed -r "s|^(.* )(.*)$|\1$S${COLOR2}\2$S${ENDCOLOR}|" <<< "$results")"
+        echo -e "$results"
+      fi
+    done
 fi
 # vim: ts=2 sts=2 sw=2 et:
