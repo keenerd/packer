@@ -586,7 +586,7 @@ if [[ $option = download ]]; then
   done
 fi
 
-# Search (-Ss) handling
+# Search handling (-Ss / -Qs)
 if [[ $option = search || $option = searchinstall ]]; then
   # query installed packages
   if [[ $mode = query ]]; then
@@ -695,7 +695,7 @@ if [[ $option = search || $option = searchinstall ]]; then
   fi
 fi
 
-# Info (-Si) handling
+# Info handling (-Si / -Qi)
 if [[ $option = info ]]; then
   if [[ $mode = query ]]; then
     for package in "${packageargs[@]}"; do
