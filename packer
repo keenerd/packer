@@ -444,9 +444,10 @@ packageargs=()
 while [[ $1 ]]; do
   case "$1" in
     # local (query) options
+    '-Q') option=queryver ;;
     '-Qs') mode=query ; option=search ;;
     '-Qsq'|'-Qqs') mode=query ; option=search ; quiet='1' ;;
-    '-Q'|'-Qi') mode=query ; option=info ;;
+    '-Qi') mode=query ; option=info ;;
 
     # remote (sync) options
     '-S') option=install ;;
