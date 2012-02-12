@@ -103,6 +103,10 @@ existsinpacman() {
   pacman -Si -- "$1" &>/dev/null
 }
 
+existslocal() {
+  pacman -Qi -- "$1" &>/dev/null
+}
+
 # Tests whether $1 is provided in pacman, sets globally accessibly providepkg var
 providedinpacman() {
   IFS=$'\n'
@@ -694,13 +698,18 @@ fi
 # Info (-Si) handling
 if [[ $option = info ]]; then
   if [[ $mode = query ]]; then
-    results="$(pacman -Qi -- "${packageargs[@]}")"
-    results="$(sed -r "s|^(Name[^:]*:)(.*)$|\1$S${COLOR1}\2$S${ENDCOLOR}|" <<< "$results")"
-    results="$(sed -r "s|^(Version[^:]*:)(.*)$|\1$S${COLOR2}\2$S${ENDCOLOR}|" <<< "$results")"
-    results="$(sed -r "s|^(URL[^:]*:)(.*)$|\1$S${COLOR4}\2$S${ENDCOLOR}|" <<< "$results")"
-    results="$(sed -r "s|^[^ ][^:]*:|$S${COLOR1}&$S${ENDCOLOR}|" <<< "$results")"
-    echo -e "$results"
-    exit
+    for package in "${packageargs[@]}"; do
+      if ! existslocal "$package"; then
+        echo -e "${COLOR6}warning:${ENDCOLOR} package '$package' was not found, skipping.."
+      else
+        results="$(pacman -Qi -- $package)"
+        results="$(sed -r "s|^(Name[^:]*:)(.*)$|\1$S${COLOR1}\2$S${ENDCOLOR}|" <<< "$results")"
+        results="$(sed -r "s|^(Version[^:]*:)(.*)$|\1$S${COLOR2}\2$S${ENDCOLOR}|" <<< "$results")"
+        results="$(sed -r "s|^(URL[^:]*:)(.*)$|\1$S${COLOR4}\2$S${ENDCOLOR}|" <<< "$results")"
+        results="$(sed -r "s|^[^ ][^:]*:|$S${COLOR1}&$S${ENDCOLOR}|" <<< "$results")"
+        echo -e "$results\n"
+      fi
+    done
   else
     # Pacman info check
     sourcemakepkgconf
