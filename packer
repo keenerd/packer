@@ -693,61 +693,72 @@ fi
 
 # Info (-Si) handling
 if [[ $option = info ]]; then
-  # Pacman info check
-  sourcemakepkgconf
-  for package in "${packageargs[@]}"; do
-    if ! [[ $auronly ]] && existsinpacman "$package"; then
-      results="$(pacman -Si -- "$package")"
-      results="$(sed -r "s|^(Repository[^:]*:)(.*)$|\1$S${COLOR3}\2$S${ENDCOLOR}|" <<< "$results")"
-      results="$(sed -r "s|^(Name[^:]*:)(.*)$|\1$S${COLOR1}\2$S${ENDCOLOR}|" <<< "$results")"
-      results="$(sed -r "s|^(Version[^:]*:)(.*)$|\1$S${COLOR2}\2$S${ENDCOLOR}|" <<< "$results")"
-      results="$(sed -r "s|^(URL[^:]*:)(.*)$|\1$S${COLOR4}\2$S${ENDCOLOR}|" <<< "$results")"
-      results="$(sed -r "s|^[^ ][^:]*:|$S${COLOR1}&$S${ENDCOLOR}|" <<< "$results")"
-      echo -e "$results"
-      exit
-    else # Check to see if it is in the aur
-      pkginfo "$package"
-      [[ -s "$tmpdir/$package.PKGBUILD" ]] || err "${COLOR7}error:${ENDCOLOR} package '$package' was not found"
-      . "$tmpdir/$package.PKGBUILD"
+  if [[ $mode = query ]]; then
+    results="$(pacman -Qi -- "${packageargs[@]}")"
+    results="$(sed -r "s|^(Repository[^:]*:)(.*)$|\1$S${COLOR3}\2$S${ENDCOLOR}|" <<< "$results")"
+    results="$(sed -r "s|^(Name[^:]*:)(.*)$|\1$S${COLOR1}\2$S${ENDCOLOR}|" <<< "$results")"
+    results="$(sed -r "s|^(Version[^:]*:)(.*)$|\1$S${COLOR2}\2$S${ENDCOLOR}|" <<< "$results")"
+    results="$(sed -r "s|^(URL[^:]*:)(.*)$|\1$S${COLOR4}\2$S${ENDCOLOR}|" <<< "$results")"
+    results="$(sed -r "s|^[^ ][^:]*:|$S${COLOR1}&$S${ENDCOLOR}|" <<< "$results")"
+    echo -e "$results"
+    exit
+  else
+    # Pacman info check
+    sourcemakepkgconf
+    for package in "${packageargs[@]}"; do
+      if ! [[ $auronly ]] && existsinpacman "$package"; then
+        results="$(pacman -Si -- "$package")"
+        results="$(sed -r "s|^(Repository[^:]*:)(.*)$|\1$S${COLOR3}\2$S${ENDCOLOR}|" <<< "$results")"
+        results="$(sed -r "s|^(Name[^:]*:)(.*)$|\1$S${COLOR1}\2$S${ENDCOLOR}|" <<< "$results")"
+        results="$(sed -r "s|^(Version[^:]*:)(.*)$|\1$S${COLOR2}\2$S${ENDCOLOR}|" <<< "$results")"
+        results="$(sed -r "s|^(URL[^:]*:)(.*)$|\1$S${COLOR4}\2$S${ENDCOLOR}|" <<< "$results")"
+        results="$(sed -r "s|^[^ ][^:]*:|$S${COLOR1}&$S${ENDCOLOR}|" <<< "$results")"
+        echo -e "$results"
+        exit
+      else # Check to see if it is in the aur
+        pkginfo "$package"
+        [[ -s "$tmpdir/$package.PKGBUILD" ]] || err "${COLOR7}error:${ENDCOLOR} package '$package' was not found"
+        . "$tmpdir/$package.PKGBUILD"
 
-      # Grap package ID
-      rpcinfo "$package"
-      pkgid=$(jshon -Q -e results -e ID -u < "$tmpdir/$package.info")
+        # Grap package ID
+        rpcinfo "$package"
+        pkgid=$(jshon -Q -e results -e ID -u < "$tmpdir/$package.info")
 
-      # Echo out the -Si formatted package information
-      # Retrieve each element in order and echo them immediately
-      echo -e "${COLOR1}Repository     : ${COLOR3}aur"
-      echo -e "${COLOR1}Name           : $pkgname"
-      echo -e "${COLOR1}Version        : ${COLOR2}$pkgver-$pkgrel"
-      echo -e "${COLOR1}URL            : ${COLOR4}$url"
-      echo -e "${COLOR1}AUR            : ${COLOR4}${PKGURL}.php?ID=$pkgid"
-      echo -e "${COLOR1}Licenses       : ${ENDCOLOR}${license[@]}"
-      echo -e "${COLOR1}Groups         : ${ENDCOLOR}${groups[@]:-None}"
-      echo -e "${COLOR1}Provides       : ${ENDCOLOR}${provides[@]:-None}"
-      echo -e "${COLOR1}Depends On     : ${ENDCOLOR}${depends[@]}"
-      echo -e "${COLOR1}Make Depends   : ${ENDCOLOR}${makedepends[@]}"
-      echo -e -n "${COLOR1}Optional Deps  : ${ENDCOLOR}"
+        # Echo out the -Si formatted package information
+        # Retrieve each element in order and echo them immediately
+        echo -e "${COLOR1}Repository     : ${COLOR3}aur"
+        echo -e "${COLOR1}Name           : $pkgname"
+        echo -e "${COLOR1}Version        : ${COLOR2}$pkgver-$pkgrel"
+        echo -e "${COLOR1}URL            : ${COLOR4}$url"
+        echo -e "${COLOR1}AUR            : ${COLOR4}${PKGURL}.php?ID=$pkgid"
+        echo -e "${COLOR1}Licenses       : ${ENDCOLOR}${license[@]}"
+        echo -e "${COLOR1}Groups         : ${ENDCOLOR}${groups[@]:-None}"
+        echo -e "${COLOR1}Provides       : ${ENDCOLOR}${provides[@]:-None}"
+        echo -e "${COLOR1}Depends On     : ${ENDCOLOR}${depends[@]}"
+        echo -e "${COLOR1}Make Depends   : ${ENDCOLOR}${makedepends[@]}"
+        echo -e -n "${COLOR1}Optional Deps  : ${ENDCOLOR}"
 
-      len="${#optdepends[@]}"
-      if [[ $len -eq 0 ]]; then
-        echo "None"
-      else
-        for ((i=0 ; i<$len ; i++)); do
-          if [[ $i = 0 ]]; then
-            echo "${optdepends[$i]}"
-          else
-            echo -e "                 ${optdepends[$i]}" 
-          fi
-        done
+        len="${#optdepends[@]}"
+        if [[ $len -eq 0 ]]; then
+          echo "None"
+        else
+          for ((i=0 ; i<$len ; i++)); do
+            if [[ $i = 0 ]]; then
+              echo "${optdepends[$i]}"
+            else
+              echo -e "                 ${optdepends[$i]}" 
+            fi
+          done
+        fi
+
+        echo -e "${COLOR1}Conflicts With : ${ENDCOLOR}${conflicts[@]:-None}"
+        echo -e "${COLOR1}Replaces       : ${ENDCOLOR}${replaces[@]:-None}"
+        echo -e "${COLOR1}Architecture   : ${ENDCOLOR}${arch[@]}"
+        echo -e "${COLOR1}Description    : ${ENDCOLOR}$pkgdesc"
+        echo
       fi
-
-      echo -e "${COLOR1}Conflicts With : ${ENDCOLOR}${conflicts[@]:-None}"
-      echo -e "${COLOR1}Replaces       : ${ENDCOLOR}${replaces[@]:-None}"
-      echo -e "${COLOR1}Architecture   : ${ENDCOLOR}${arch[@]}"
-      echo -e "${COLOR1}Description    : ${ENDCOLOR}$pkgdesc"
-      echo
-    fi
-  done
+    done
+  fi
 fi
 
 # vim: ts=2 sts=2 sw=2 et:
