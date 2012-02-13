@@ -724,7 +724,7 @@ if [[ $option = info ]]; then
         echo -e "$results\n"
       else # Check to see if it is in the aur
         pkginfo "$package"
-        [[ -s "$tmpdir/$package.PKGBUILD" ]] || { echo -e "${COLOR6}warning:${ENDCOLOR} package '$package' was not found\n"; continue; }
+        [[ -s "$tmpdir/$package.PKGBUILD" ]] || { echo -e "${COLOR6}warning:${ENDCOLOR} package '$package' was not found"; continue; }
         . "$tmpdir/$package.PKGBUILD"
 
         # Grap package ID
