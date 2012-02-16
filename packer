@@ -2,7 +2,11 @@
 # Copyright Matthew Bruenig <matthewbruenig@gmail.com>
 # Licensed under GPL version 3
 
+<<<<<<< HEAD
 [[ $PACMAN_CLIENT ]] || PACMAN_CLIENT="pacman"
+=======
+[ -z $PACMAN_CLIENT ] && PACMAN_CLIENT="pacman"
+>>>>>>> fe90beaeb81e34b79fd08fe895050db465f06795
 
 # set tmpfile stuff, clean tmpdir
 tmpdir="${TMPDIR:-/tmp}/packertmp-$UID"
