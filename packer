@@ -2,6 +2,8 @@
 # Copyright Matthew Bruenig <matthewbruenig@gmail.com>
 # Licensed under GPL version 3
 
+[[ $PACMAN ]] || PACMAN="pacman"
+
 # set tmpfile stuff, clean tmpdir
 tmpdir="${TMPDIR:-/tmp}/packertmp-$UID"
 rm -rf "$tmpdir" &>/dev/null
@@ -296,9 +298,9 @@ aurinstall() {
 
   [[ $? -ne 0 ]] && echo "The build failed." && return 1
   if  [[ $2 = dependency ]]; then
-    runasroot pacman ${PACOPTS[@]} --asdeps -U $pkgname-*$PKGEXT
+    runasroot $PACMAN ${PACOPTS[@]} --asdeps -U $pkgname-*$PKGEXT
   elif [[ $2 = explicit ]]; then
-    runasroot pacman ${PACOPTS[@]} -U $pkgname-*$PKGEXT
+    runasroot $PACMAN ${PACOPTS[@]} -U $pkgname-*$PKGEXT
   fi
 }
 
@@ -351,7 +353,7 @@ installhandling() {
  
   # First install the explicit pacman packages, let pacman prompt
   if [[ $pacmanpackages ]]; then
-    runasroot pacman "${PACOPTS[@]}" -S -- "${pacmanpackages[@]}"
+    runasroot $PACMAN "${PACOPTS[@]}" -S -- "${pacmanpackages[@]}"
   fi
   if [[ -z $aurtargets ]]; then
     exit
@@ -397,7 +399,7 @@ installhandling() {
 
   # Install pacman dependencies
   if [[ $pacmandepends ]]; then
-    runasroot pacman --noconfirm --asdeps -S -- "${pacmandepends[@]}" || err "Installation failed."
+    runasroot $PACMAN --noconfirm --asdeps -S -- "${pacmandepends[@]}" || err "Installation failed."
   fi 
 
   # Install aur dependencies
@@ -477,7 +479,7 @@ if [[ $option = update ]]; then
   sourcemakepkgconf
   # Pacman update
   if ! [[ $auronly ]]; then
-    runasroot pacman "${PACOPTS[@]}" "$pacmanarg"
+    runasroot $PACMAN "${PACOPTS[@]}" "$pacmanarg"
   fi
 
   # Aur update
