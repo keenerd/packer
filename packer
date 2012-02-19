@@ -278,7 +278,7 @@ aurinstall() {
     [[ -d $dir ]] && rm -rf $dir
     mkdir -p "$dir"
     cd "$dir"
-    curl -Lfs "$PKGURL/$1/$1.tar.gz" > "$1.tar.gz"
+    curl -Lfs "$PKGURL/${1:0:2}/$1/$1.tar.gz" > "$1.tar.gz"
     tar xf "$1.tar.gz"
     cd "$1"
 
@@ -579,7 +579,7 @@ if [[ $option = download ]]; then
   done
 
   for package in "${pkglist[@]}"; do
-    curl -Lfs "$PKGURL/$package/$package.tar.gz" > "$package.tar.gz"
+    curl -Lfs "$PKGURL/${package:0:2}/$package/$package.tar.gz" > "$package.tar.gz"
     tar xf "$package.tar.gz" 
   done
 fi
