@@ -54,6 +54,9 @@ err() {
 usage() {
   echo 'usage: packer [option] [package] [package] [...]'
   echo
+  echo '    -Q          - outpus name and version for local package'
+  echo '    -Qs|-Qsq    - searches installed packages'
+  echo '    -Qi         - outputs info for local package'
   echo '    -S          - installs package'
   echo '    -Syu|-Su    - updates all packages, also takes -uu and -yy options'
   echo '    -Ss|-Ssq    - searches for package'
@@ -111,6 +114,10 @@ existsinaur() {
 # Tests whether $1 exists in pacman
 existsinpacman() {
   pacman -Si -- "$1" &>/dev/null
+}
+
+existslocal() {
+  pacman -Qi -- "$1" &>/dev/null
 }
 
 # Tests whether $1 is provided in pacman, sets globally accessibly providepkg var
@@ -385,7 +392,7 @@ installhandling() {
       echo -e "${COLOR6}warning:$ENDCOLOR $pkg is flagged out of date"
     fi
   done
-    
+
   # Prompt for aur packages and their dependencies
   echo
   if [[ $aurdepends ]]; then
@@ -453,11 +460,19 @@ nap() {
 packageargs=()
 while [[ $1 ]]; do
   case "$1" in
+    # local (query) options
+    '-Q') option=queryver ;;
+    '-Qs') mode=query ; option=search ;;
+    '-Qsq'|'-Qqs') mode=query ; option=search ; quiet='1' ;;
+    '-Qi') mode=query ; option=info ;;
+
+    # remote (sync) options
     '-S') option=install ;;
-    '-Ss') option=search ;;
-    '-Ssq'|'-Sqs') option=search ; quiet='1' ;;
-    '-Si') option=info ;;
+    '-Ss') mode=sync ; option=search ;;
+    '-Ssq'|'-Sqs') mode=sync ; option=search ; quiet='1' ;;
+    '-Si') mode=sync ; option=info ;;
     -S*u*) option=update ; pacmanarg="$1" ;;
+
     '-G') option=download ;;
     '-h'|'--help') usage ;;
     '--quiet') quiet='1' ;;
@@ -584,151 +599,198 @@ if [[ $option = download ]]; then
   done
 fi
 
-# Search (-Ss) handling
+# Search handling (-Ss / -Qs)
 if [[ $option = search || $option = searchinstall ]]; then
-  # Pacman searching 
-  if ! [[ $auronly ]]; then
+  # query installed packages
+  if [[ $mode = query ]]; then
     if [[ $quiet ]]; then
-      results="$(pacman -Ssq -- "${packageargs[@]}")"
+      results="$(pacman -Qsq -- "${packageargs[@]}")"
     else
-      results="$(pacman -Ss -- "${packageargs[@]}")"
+      results="$(pacman -Qs -- "${packageargs[@]}")"
       results="$(sed -r "s|^[^ ][^/]*/|$S${COLOR3}&$S${COLOR1}|" <<< "$results")"
       results="$(sed -r "s|^([^ ]+) ([^ ]+)(.*)$|\1 $S${COLOR2}\2$S${ENDCOLOR}\3|" <<< "$results")"
     fi
-    if [[ $option = search ]]; then
-      echo -e "$results" | fmt -"$_WIDTH" -s
-    else  # interactive
-      echo -e "$results" | fmt -"$_WIDTH" -s | nl -v 0 -w 1 -s ' ' -b 'p^[^ ]'
-    fi | sed '/^$/d'
-    pacname=( $(pacman -Ssq -- "${packageargs[@]}") )
-    pactotal="${#pacname[@]}"
+    # print results and exit
+    echo -e "$results" | fmt -"$_WIDTH" -s
+    exit
   else
-    pactotal=0
-  fi
-
-  # Aur searching and tmpfile preparation
-  for package in "${packageargs[@]}"; do
-    curl -LfGs --data-urlencode "arg=$package" "$RPCURL=search" | \
-    jshon -Q -e results -a -e Name -u -p -e Version -u -p -e NumVotes -u -p -e Description -u | \
-    sed 's/^$/-/' |  paste -s -d "\t\t\t\n" | sort -nr -k 3 > "$tmpdir/$package.search" &
-  done
-  wait
-  cp "$tmpdir/${packageargs[0]}.search" "$tmpdir/search.results"
-  for ((i=1 ; i<${#packageargs[@]} ; i++)); do
-    grep -xFf "$tmpdir/search.results" "$tmpdir/${packageargs[$i]}.search" > "$tmpdir/search.results-2"
-    mv "$tmpdir/search.results-2" "$tmpdir/search.results"
-  done
-  sed -i '/^$/d' "$tmpdir/search.results"
-
-  # Prepare tmp file and arrays
-  IFS=$'\n'
-  aurname=( $(cut -f 1 "$tmpdir/search.results") )
-  aurtotal="${#aurname[@]}"
-  alltotal="$(($pactotal+$aurtotal))"
-  # Echo out the -Ss formatted package information
-
-  IFS=$'\t\n'
-  if [[ $option = search ]]; then
-    if [[ $quiet ]]; then
-      printf "%s\n" ${aurname[@]}
-    elif [[ -s "$tmpdir/search.results" ]]; then
-      printf "${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(cat "$tmpdir/search.results")
-    fi
-  else
-    # interactive
-    if [[ $quiet ]]; then
-      nl -v ${pactotal:-0} -w 1 -s ' ' <(cut -f 1 "$tmpdir/search.results")
-    elif [[ -s "$tmpdir/search.results" ]]; then
-      printf "%d ${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(nl -v ${pactotal:-0} -w 1 < "$tmpdir/search.results")
-    fi
-  fi | fmt -"$_WIDTH" -s
-
-  # Prompt and install selected numbers
-  if [[ $option = searchinstall ]]; then
-    pkglist=()
-    allpackages=( "${pacname[@]}" "${aurname[@]}" )
-
-    # Exit if there are no matches
-    [[ $allpackages ]] || exit
-
-    # Prompt for numbers
-    echo
-    echo -e "${COLOR2}Type numbers to install. Separate each number with a space.${ENDCOLOR}"
-    echo -ne "${COLOR2}Numbers: ${ENDCOLOR}"
-    read -r
-    
-    # Parse answer
-    if [[ $REPLY ]]; then
-      IFS=' '
-      for num in $REPLY; do
-        if [[ $num -lt $alltotal ]]; then
-          pkglist+=("${allpackages[$num]}")
-        else
-          err "Number \`$num' is not assigned to any of the packages."
-        fi
-      done
-    fi
-
-    # Call installhandling to take care of the packages chosen 
-    installhandling "${pkglist[@]}"
-  fi
-
-  # Remove the tmpfiles
-  rm -f "$tmpdir/*search" &>/dev/null
-  rm -f "$tmpdir/search.result" &>/dev/null
-  exit
-fi
-
-# Info (-Si) handling
-if [[ $option = info ]]; then
-  # Pacman info check
-  sourcemakepkgconf
-  for package in "${packageargs[@]}"; do
-    if ! [[ $auronly ]] && existsinpacman "$package"; then
-      results="$(pacman -Si -- "$package")"
-      results="$(sed -r "s|^(Repository[^:]*:)(.*)$|\1$S${COLOR3}\2$S${ENDCOLOR}|" <<< "$results")"
-      results="$(sed -r "s|^(Name[^:]*:)(.*)$|\1$S${COLOR1}\2$S${ENDCOLOR}|" <<< "$results")"
-      results="$(sed -r "s|^(Version[^:]*:)(.*)$|\1$S${COLOR2}\2$S${ENDCOLOR}|" <<< "$results")"
-      results="$(sed -r "s|^(URL[^:]*:)(.*)$|\1$S${COLOR4}\2$S${ENDCOLOR}|" <<< "$results")"
-      results="$(sed -r "s|^[^ ][^:]*:|$S${COLOR1}&$S${ENDCOLOR}|" <<< "$results")"
-      echo -e "$results"
-      exit
-    else # Check to see if it is in the aur
-      pkginfo "$package"
-      [[ -s "$tmpdir/$package.PKGBUILD" ]] || err "${COLOR7}error:${ENDCOLOR} package '$package' was not found"
-      . "$tmpdir/$package.PKGBUILD"
-
-      # Echo out the -Si formatted package information
-      # Retrieve each element in order and echo them immediately
-      echo -e "${COLOR1}Repository     : ${COLOR3}aur"
-      echo -e "${COLOR1}Name           : $pkgname"
-      echo -e "${COLOR1}Version        : ${COLOR2}$pkgver-$pkgrel"
-      echo -e "${COLOR1}URL            : ${COLOR4}$url"
-      echo -e "${COLOR1}Licenses       : ${ENDCOLOR}${license[@]}"
-      echo -e "${COLOR1}Groups         : ${ENDCOLOR}${groups[@]:-None}"
-      echo -e "${COLOR1}Provides       : ${ENDCOLOR}${provides[@]:-None}"
-      echo -e "${COLOR1}Depends On     : ${ENDCOLOR}${depends[@]}"
-      echo -e "${COLOR1}Make Depends   : ${ENDCOLOR}${makedepends[@]}"
-      echo -e -n "${COLOR1}Optional Deps  : ${ENDCOLOR}"
-
-      len="${#optdepends[@]}"
-      if [[ $len -eq 0 ]]; then
-        echo "None"
+    # Pacman searching 
+    if ! [[ $auronly ]]; then
+      if [[ $quiet ]]; then
+        results="$(pacman -Ssq -- "${packageargs[@]}")"
       else
-        for ((i=0 ; i<$len ; i++)); do
-          if [[ $i = 0 ]]; then
-            echo "${optdepends[$i]}"
+        results="$(pacman -Ss -- "${packageargs[@]}")"
+        results="$(sed -r "s|^[^ ][^/]*/|$S${COLOR3}&$S${COLOR1}|" <<< "$results")"
+        results="$(sed -r "s|^([^ ]+) ([^ ]+)(.*)$|\1 $S${COLOR2}\2$S${ENDCOLOR}\3|" <<< "$results")"
+      fi
+      if [[ $option = search ]]; then
+        echo -e "$results" | fmt -"$_WIDTH" -s
+      else  # interactive
+        echo -e "$results" | fmt -"$_WIDTH" -s | nl -v 0 -w 1 -s ' ' -b 'p^[^ ]'
+      fi | sed '/^$/d'
+      pacname=( $(pacman -Ssq -- "${packageargs[@]}") )
+      pactotal="${#pacname[@]}"
+    else
+      pactotal=0
+    fi
+
+    # Aur searching and tmpfile preparation
+    for package in "${packageargs[@]}"; do
+      curl -LfGs --data-urlencode "arg=$package" "$RPCURL=search" | \
+      jshon -Q -e results -a -e Name -u -p -e Version -u -p -e NumVotes -u -p -e Description -u | \
+      sed 's/^$/-/' |  paste -s -d "\t\t\t\n" | sort -nr -k 3 > "$tmpdir/$package.search" &
+    done
+    wait
+    cp "$tmpdir/${packageargs[0]}.search" "$tmpdir/search.results"
+    for ((i=1 ; i<${#packageargs[@]} ; i++)); do
+      grep -xFf "$tmpdir/search.results" "$tmpdir/${packageargs[$i]}.search" > "$tmpdir/search.results-2"
+      mv "$tmpdir/search.results-2" "$tmpdir/search.results"
+    done
+    sed -i '/^$/d' "$tmpdir/search.results"
+
+    # Prepare tmp file and arrays
+    IFS=$'\n'
+    aurname=( $(cut -f 1 "$tmpdir/search.results") )
+    aurtotal="${#aurname[@]}"
+    alltotal="$(($pactotal+$aurtotal))"
+    # Echo out the -Ss formatted package information
+
+    IFS=$'\t\n'
+    if [[ $option = search ]]; then
+      if [[ $quiet ]]; then
+        printf "%s\n" ${aurname[@]}
+      elif [[ -s "$tmpdir/search.results" ]]; then
+        printf "${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(cat "$tmpdir/search.results")
+      fi
+    else
+      # interactive
+      if [[ $quiet ]]; then
+        nl -v ${pactotal:-0} -w 1 -s ' ' < $(cut -f 1 "$tmpdir/search.results")
+      elif [[ -s "$tmpdir/search.results" ]]; then
+        printf "%d ${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(nl -v ${pactotal:-0} -w 1 < "$tmpdir/search.results")
+      fi
+    fi | fmt -"$_WIDTH" -s
+
+    # Prompt and install selected numbers
+    if [[ $option = searchinstall ]]; then
+      pkglist=()
+      allpackages=( "${pacname[@]}" "${aurname[@]}" )
+
+      # Exit if there are no matches
+      [[ $allpackages ]] || exit
+
+      # Prompt for numbers
+      echo
+      echo -e "${COLOR2}Type numbers to install. Separate each number with a space.${ENDCOLOR}"
+      echo -ne "${COLOR2}Numbers: ${ENDCOLOR}"
+      read -r
+
+      # Parse answer
+      if [[ $REPLY ]]; then
+        IFS=' '
+        for num in $REPLY; do
+          if [[ $num -lt $alltotal ]]; then
+            pkglist+=("${allpackages[$num]}")
           else
-            echo -e "                 ${optdepends[$i]}" 
+            err "Number \`$num' is not assigned to any of the packages."
           fi
         done
       fi
 
-      echo -e "${COLOR1}Conflicts With : ${ENDCOLOR}${conflicts[@]:-None}"
-      echo -e "${COLOR1}Replaces       : ${ENDCOLOR}${replaces[@]:-None}"
-      echo -e "${COLOR1}Architecture   : ${ENDCOLOR}${arch[@]}"
-      echo -e "${COLOR1}Description    : ${ENDCOLOR}$pkgdesc"
-      echo
+      # Call installhandling to take care of the packages chosen 
+      installhandling "${pkglist[@]}"
     fi
-  done
+
+    # Remove the tmpfiles
+    rm -f "$tmpdir/*search" &>/dev/null
+    rm -f "$tmpdir/search.result" &>/dev/null
+    exit
+  fi
 fi
+
+# Info handling (-Si / -Qi)
+if [[ $option = info ]]; then
+  if [[ $mode = query ]]; then
+    for package in "${packageargs[@]}"; do
+      if ! existslocal "$package"; then
+        echo -e "${COLOR6}warning:${ENDCOLOR} package '$package' was not found, skipping.."
+      else
+        results="$(pacman -Qi -- $package)"
+        results="$(sed -r "s|^(Name[^:]*:)(.*)$|\1$S${COLOR1}\2$S${ENDCOLOR}|" <<< "$results")"
+        results="$(sed -r "s|^(Version[^:]*:)(.*)$|\1$S${COLOR2}\2$S${ENDCOLOR}|" <<< "$results")"
+        results="$(sed -r "s|^(URL[^:]*:)(.*)$|\1$S${COLOR4}\2$S${ENDCOLOR}|" <<< "$results")"
+        results="$(sed -r "s|^[^ ][^:]*:|$S${COLOR1}&$S${ENDCOLOR}|" <<< "$results")"
+        echo -e "$results\n"
+      fi
+    done
+  else
+    # Pacman info check
+    sourcemakepkgconf
+    for package in "${packageargs[@]}"; do
+      if ! [[ $auronly ]] && existsinpacman "$package"; then
+        results="$(pacman -Si -- "$package")"
+        results="$(sed -r "s|^(Repository[^:]*:)(.*)$|\1$S${COLOR3}\2$S${ENDCOLOR}|" <<< "$results")"
+        results="$(sed -r "s|^(Name[^:]*:)(.*)$|\1$S${COLOR1}\2$S${ENDCOLOR}|" <<< "$results")"
+        results="$(sed -r "s|^(Version[^:]*:)(.*)$|\1$S${COLOR2}\2$S${ENDCOLOR}|" <<< "$results")"
+        results="$(sed -r "s|^(URL[^:]*:)(.*)$|\1$S${COLOR4}\2$S${ENDCOLOR}|" <<< "$results")"
+        results="$(sed -r "s|^[^ ][^:]*:|$S${COLOR1}&$S${ENDCOLOR}|" <<< "$results")"
+        echo -e "$results\n"
+      else # Check to see if it is in the aur
+        pkginfo "$package"
+        [[ -s "$tmpdir/$package.PKGBUILD" ]] || { echo -e "${COLOR6}warning:${ENDCOLOR} package '$package' was not found"; continue; }
+        . "$tmpdir/$package.PKGBUILD"
+
+        # Grap package ID
+        rpcinfo "$package"
+        pkgid=$(jshon -Q -e results -e ID -u < "$tmpdir/$package.info")
+
+        # Echo out the -Si formatted package information
+        # Retrieve each element in order and echo them immediately
+        echo -e "${COLOR1}Repository     : ${COLOR3}aur"
+        echo -e "${COLOR1}Name           : $pkgname"
+        echo -e "${COLOR1}Version        : ${COLOR2}$pkgver-$pkgrel"
+        echo -e "${COLOR1}URL            : ${COLOR4}$url"
+        echo -e "${COLOR1}AUR            : ${COLOR4}${PKGURL}.php?ID=$pkgid"
+        echo -e "${COLOR1}Licenses       : ${ENDCOLOR}${license[@]}"
+        echo -e "${COLOR1}Groups         : ${ENDCOLOR}${groups[@]:-None}"
+        echo -e "${COLOR1}Provides       : ${ENDCOLOR}${provides[@]:-None}"
+        echo -e "${COLOR1}Depends On     : ${ENDCOLOR}${depends[@]}"
+        echo -e "${COLOR1}Make Depends   : ${ENDCOLOR}${makedepends[@]}"
+        echo -e -n "${COLOR1}Optional Deps  : ${ENDCOLOR}"
+
+        len="${#optdepends[@]}"
+        if [[ $len -eq 0 ]]; then
+          echo "None"
+        else
+          for ((i=0 ; i<$len ; i++)); do
+            if [[ $i = 0 ]]; then
+              echo "${optdepends[$i]}"
+            else
+              echo -e "                 ${optdepends[$i]}" 
+            fi
+          done
+        fi
+
+        echo -e "${COLOR1}Conflicts With : ${ENDCOLOR}${conflicts[@]:-None}"
+        echo -e "${COLOR1}Replaces       : ${ENDCOLOR}${replaces[@]:-None}"
+        echo -e "${COLOR1}Architecture   : ${ENDCOLOR}${arch[@]}"
+        echo -e "${COLOR1}Description    : ${ENDCOLOR}$pkgdesc"
+        echo
+      fi
+    done
+  fi
+fi
+
+# Info -Q handling
+if [[ $option = queryver ]]; then
+    for package in "${packageargs[@]}"; do
+      if ! existslocal "$package"; then
+        echo -e "${COLOR6}warning:${ENDCOLOR} package '$package' was not found, skipping.."
+      else
+        results="$(pacman -Q -- "$package")"
+        results="$(sed -r "s|^(.* )(.*)$|\1$S${COLOR2}\2$S${ENDCOLOR}|" <<< "$results")"
+        echo -e "$results"
+      fi
+    done
+fi
+# vim: ts=2 sts=2 sw=2 et:
