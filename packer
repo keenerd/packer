@@ -25,7 +25,7 @@ usermakepkgconf="$HOME/.makepkg.conf"
 pacmanconf='/etc/pacman.conf'
 
 RPCURL="https://aur.archlinux.org/rpc.php?type"
-PKGURL="https://aur.archlinux.org/packages"
+PKGURL="https://aur.archlinux.org"
 
 if [[ -t 1 && ! $COLOR = "NO" ]]; then
   COLOR1='\e[1;39m'
@@ -91,9 +91,7 @@ sourcemakepkgconf() {
 
 # Parse IgnorePkg and --ignore, put in globally accessible ignoredpackages array
 getignoredpackages() {
-  IFS=','
-  ignoredpackages=($ignorearg)
-  IFS=$'\n'" "
+  IFS=',' read -ra ignoredpackages <<< "$ignorearg"
   ignoredpackages+=( $(grep '^ *IgnorePkg' "$pacmanconf" | cut -d '=' -f 2-) )
 }
 
@@ -115,8 +113,7 @@ existsinpacman() {
 
 # Tests whether $1 is provided in pacman, sets globally accessibly providepkg var
 providedinpacman() {
-  IFS=$'\n'
-  providepkg=( $(pacman -Ssq -- "^$1$") )
+  IFS=$'\n' read -rd '' -a providepkg < <(pacman -Ssq -- "^$1$")
 }
 
 # Tests whether $1 exists in a pacman group
@@ -135,6 +132,7 @@ scrapeaurdeps() {
   . "$tmpdir/$1.PKGBUILD"
   IFS=$'\n'
   dependencies=( $(echo -e "${depends[*]}\n${makedepends[*]}" | sed -e 's/=.*//' -e 's/>.*//' -e 's/<.*//'| sort -u) )
+  unset IFS
 }
 
 # Finds dependencies of package $1
@@ -231,9 +229,15 @@ rpcinfo() {
   fi
 }
 
+pkglink() {
+  rpcinfo $1
+  echo "${PKGURL}$(jshon -e results -e URLPath -u < "$tmpdir/$1.info")"
+}
+
 pkginfo() {
   if ! [[ -f "$tmpdir/$1.PKGBUILD" ]]; then
-    curl -Lfs "$PKGURL/$1/PKGBUILD" > "$tmpdir/$1.PKGBUILD"
+    pkgpath=$(pkglink $1)
+    curl -Lfs "${pkgpath%/*}/PKGBUILD" > "$tmpdir/$1.PKGBUILD"
   fi
 }
 
@@ -278,7 +282,7 @@ aurinstall() {
     [[ -d $dir ]] && rm -rf $dir
     mkdir -p "$dir"
     cd "$dir"
-    curl -Lfs "$PKGURL/${1:0:2}/$1/$1.tar.gz" > "$1.tar.gz"
+    curl -Lfs "$(pkglink $1)" > "$1.tar.gz"
     tar xf "$1.tar.gz"
     cd "$1"
 
@@ -395,8 +399,8 @@ installhandling() {
     echo -e "${COLOR6}Aur Targets    ($((${#aurtargets[@]}))):${ENDCOLOR} ${aurtargets[@]}"
   fi
   if [[ $pacmandepends ]]; then
-    IFS=$'\n'
-    pacmandepends=( $(printf "%s\n" "${pacmandepends[@]}" | sort -u) )
+    IFS=$'\n' read -rd '' -a pacmandepends < \
+      <(printf "%s\n" "${pacmandepends[@]}" | sort -u)
     echo -e "${COLOR6}Pacman Targets (${#pacmandepends[@]}):${ENDCOLOR} ${pacmandepends[@]}"
   fi
 
@@ -495,8 +499,7 @@ if [[ $option = update ]]; then
 
   # Aur update
   echo -e "${COLOR5}:: ${COLOR1}Synchronizing aur database...${ENDCOLOR}"
-  IFS=$'\n'
-  packages=( $(pacman -Qm) )
+  IFS=$'\n' read -rd '' -a packages < <(pacman -Qm)
   newpackages=()
   checkignores=()
   total="${#packages[@]}"
@@ -579,7 +582,7 @@ if [[ $option = download ]]; then
   done
 
   for package in "${pkglist[@]}"; do
-    curl -Lfs "$PKGURL/${package:0:2}/$package/$package.tar.gz" > "$package.tar.gz"
+    curl -Lfs "$(pkglink $package)" > "$package.tar.gz"
     tar xf "$package.tar.gz" 
   done
 fi
@@ -621,8 +624,7 @@ if [[ $option = search || $option = searchinstall ]]; then
   sed -i '/^$/d' "$tmpdir/search.results"
 
   # Prepare tmp file and arrays
-  IFS=$'\n'
-  aurname=( $(cut -f 1 "$tmpdir/search.results") )
+  IFS=$'\n' read -rd '' -a aurname < <(cut -f 1 "$tmpdir/search.results")
   aurtotal="${#aurname[@]}"
   alltotal="$(($pactotal+$aurtotal))"
   # Echo out the -Ss formatted package information
@@ -642,6 +644,7 @@ if [[ $option = search || $option = searchinstall ]]; then
       printf "%d ${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(nl -v ${pactotal:-0} -w 1 < "$tmpdir/search.results")
     fi
   fi | fmt -"$_WIDTH" -s
+  unset IFS
 
   # Prompt and install selected numbers
   if [[ $option = searchinstall ]]; then
@@ -659,7 +662,6 @@ if [[ $option = search || $option = searchinstall ]]; then
     
     # Parse answer
     if [[ $REPLY ]]; then
-      IFS=' '
       for num in $REPLY; do
         if [[ $num -lt $alltotal ]]; then
           pkglist+=("${allpackages[$num]}")
