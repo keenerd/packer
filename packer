@@ -67,6 +67,8 @@ usage() {
   echo '    --auronly   - only do actions for aur'
   echo '    --devel     - update devel packages during -Su'
   echo '    --skipinteg - when using makepkg, do not check md5s'
+  echo '    --sign      - when using makepkg, sign the pkg'
+  echo '    --nosign    - when using makepkg, do not sign the pkg'
   echo '    -h          - outputs this message'
   exit
 }
@@ -306,9 +308,9 @@ aurinstall() {
 
   # Installation (makepkg and pacman)
   if [[ $UID -eq 0 ]]; then
-    makepkg $MAKEPKGOPTS --asroot -f
+    makepkg ${MAKEPKGOPTS[@]} --asroot -f
   else
-    makepkg $MAKEPKGOPTS -f
+    makepkg ${MAKEPKGOPTS[@]} -f
   fi
 
   [[ $? -ne 0 ]] && echo "The build failed." && return 1
@@ -470,7 +472,9 @@ while [[ $1 ]]; do
     '--noedit') noedit='1' ;;
     '--auronly') auronly='1' ;;
     '--devel') devel='1' ;;
-    '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
+    '--skipinteg') MAKEPKGOPTS+=("--skipinteg") ;;
+    '--nosign') MAKEPKGOPTS+=("--nosign") ;;
+    '--sign') MAKEPKGOPTS+=("--sign") ;;
     '--') shift ; packageargs+=("$@") ; break ;;
     -*) echo "packer: Option \`$1' is not valid." ; exit 5 ;;
     *) packageargs+=("$1") ;;
