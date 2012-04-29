@@ -452,6 +452,14 @@ nap() {
   done
 }
 
+# Load default arguments from ~/.packerrc
+conffile=$HOME/.packerrc
+if [ -f $conffile ]; then
+	while IFS=\= read -r opt; do
+		export $opt=0
+	done < $conffile
+fi
+
 # Argument parsing
 [[ $1 ]] || usage
 packageargs=()
