@@ -1,5 +1,8 @@
 #!/bin/bash
-# Copyright Matthew Bruenig <matthewbruenig@gmail.com>
+#
+# Copyright (C) 2010 Matthew Bruenig <matthewbruenig@gmail.com>
+# Copyright (C) 2012 Mateusz Loskot <mateusz@loskot.net>
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -57,6 +60,7 @@ usage() {
   echo '    -Ss|-Ssq    - searches for package'
   echo '    -Si         - outputs info for package'
   echo '    -G          - download and extract aur tarball only'
+  echo '    -P          - purge cache content'
   echo
   echo '    --quiet     - only output package name for searches'
   echo '    --ignore    - takes a comma-separated list of packages to ignore'
@@ -107,7 +111,7 @@ isignored() {
 # Tests whether $1 exists on the aur
 existsinaur() {
   rpcinfo "$1"
-  [[ "$(jshon -Qe type -u < "$tmpdir/$1.info")" = "info" ]]
+  [[ "$(jshon -Qe type -u < "$cachedir/$1.info")" = "info" ]]
 }
 
 # Tests whether $1 exists in pacman
@@ -133,7 +137,7 @@ existsinlocal() {
 # Scrapes the aur deps from PKGBUILDS and puts in globally available dependencies array
 scrapeaurdeps() {
   pkginfo "$1"
-  . "$tmpdir/$1.PKGBUILD"
+  . "$cachedir/$1.PKGBUILD"
   IFS=$'\n'
   dependencies=( $(echo -e "${depends[*]}\n${makedepends[*]}" | sed -e 's/=.*//' -e 's/>.*//' -e 's/<.*//'| sort -u) )
   unset IFS
@@ -228,20 +232,20 @@ aurbar() {
 }
 
 rpcinfo() {
-  if ! [[ -f "$tmpdir/$1.info" ]]; then
-    curl -LfGs --data-urlencode "arg=$1" "$RPCURL=info" > "$tmpdir/$1.info"
+  if ! [[ -f "$cachedir/$1.info" ]]; then
+    curl -LfGs --data-urlencode "arg=$1" "$RPCURL=info" > "$cachedir/$1.info"
   fi
 }
 
 pkglink() {
   rpcinfo $1
-  echo "${PKGURL}$(jshon -Q -e results -e URLPath -u < "$tmpdir/$1.info")"
+  echo "${PKGURL}$(jshon -Q -e results -e URLPath -u < "$cachedir/$1.info")"
 }
 
 pkginfo() {
-  if ! [[ -f "$tmpdir/$1.PKGBUILD" ]]; then
+  if ! [[ -f "$cachedir/$1.PKGBUILD" ]]; then
     pkgpath=$(pkglink $1)
-    curl -Lfs "${pkgpath%/*}/PKGBUILD" > "$tmpdir/$1.PKGBUILD"
+    curl -Lfs "${pkgpath%/*}/PKGBUILD" > "$cachedir/$1.PKGBUILD"
   fi
 }
 
@@ -250,7 +254,7 @@ aurversionisnewer() {
   rpcinfo "$1"
   unset aurversion
   if existsinaur "$1"; then
-    aurversion="$(jshon -Q -e results -e Version -u < "$tmpdir/$1.info")"
+    aurversion="$(jshon -Q -e results -e Version -u < "$cachedir/$1.info")"
     if [[ "$(LC_ALL=C vercmp "$aurversion" "$2")" -gt 0  ]]; then
       return 0
     fi
@@ -260,7 +264,7 @@ aurversionisnewer() {
 
 isoutofdate() {
   rpcinfo "$1"
-  [[ "$(jshon -Q -e results -e OutOfDate -u < "$tmpdir/$1.info")" = "1" ]]
+  [[ "$(jshon -Q -e results -e OutOfDate -u < "$cachedir/$1.info")" = "1" ]]
 }
 
 # $1 is prompt, $2 is file
@@ -276,7 +280,7 @@ confirm_edit() {
 
 # Installs packages from aur ($1 is package, $2 is dependency or explicit)
 aurinstall() {
-  dir="${TMPDIR:-/tmp}/packerbuild-$UID/$1"
+  dir="$PACKER_CACHEDIR/$1"
 
   # Prepare the installation directory
   # If there is an old directory and aurversion is not newer, use old directory
@@ -439,6 +443,14 @@ installhandling() {
   done
 }
 
+# Purges cached packages and creates empty cache ($1 cache location)
+purgecache() {
+	echo -e "${COLOR5}:: ${COLOR1}Purging aur cache in '$1'...${ENDCOLOR}"
+	if [[ -d $1 ]]; then
+		rm -rf "$1" &>/dev/null
+	fi
+}
+
 # proceed with installation prompt
 proceed() {
   read -n 1
@@ -456,18 +468,6 @@ nap() {
   done
 }
 
-# load packer.conf
-sourcepackerconf
-if [[ -n $PACKERTMPDIR ]]; then
-	tmpdir="$PACKERTMPDIR"
-else
-	tmpdir="${TMPDIR:-/tmp}/packertmp-$UID"
-fi
-
-# set tmpfile stuff, clean tmpdir
-rm -rf "$tmpdir" &>/dev/null
-mkdir -p "$tmpdir"
-
 # Argument parsing
 [[ $1 ]] || usage
 packageargs=()
@@ -479,6 +479,7 @@ while [[ $1 ]]; do
     '-Si') option=info ;;
     -S*u*) option=update ; pacmanarg="$1" ;;
     '-G') option=download ;;
+    '-P') option=purgecache ;;
     '-h'|'--help') usage ;;
     '--quiet') quiet='1' ;;
     '--ignore') ignorearg="$2" ; PACOPTS+=("--ignore" "$2") ; shift ;;
@@ -493,6 +494,28 @@ while [[ $1 ]]; do
   esac
   shift
 done
+
+# Load packer.conf
+sourcepackerconf
+if [[ -z $PACKER_CACHEDIR ]]; then
+	PACKER_CACHEDIR="${TMPDIR:-/tmp}/packertmp-$UID"
+fi
+echo -e "${COLOR5}:: ${COLOR1}Setting aur cache in '$PACKER_CACHEDIR'...${ENDCOLOR}"
+
+# Set cache location
+cachedir="$PACKER_CACHEDIR"
+
+# Clean cache, if requested
+if [[ $option = purgecache ]]; then
+		purgecache "$cachedir" || err "Failed to purge cache"
+		exit
+else
+	if ! $PACKER_KEEP_CACHE; then
+		purgecache "$cachedir"
+	fi
+fi
+# Recreate cache directory
+[[ -d "$cachedir" ]] || mkdir -p "$cachedir"
 
 # Sanity checks
 [[ $option ]] || option="searchinstall"
@@ -536,14 +559,14 @@ if [[ $option = update ]]; then
     for ((i=0; i<$total; i++)); do 
       pkg="${packages[i]%% *}"
       ver="${packages[i]##* }"
-      if [[ ! -s "$tmpdir/$pkg.PKGBUILD" ]]; then
+      if [[ ! -s "$cachedir/$pkg.PKGBUILD" ]]; then
         continue
       fi
       if isignored "$pkg"; then
         continue
       fi
       unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
-      . "$tmpdir/$pkg.PKGBUILD"
+      . "$cachedir/$pkg.PKGBUILD"
       if [[ "$(LC_ALL=C vercmp "$pkgver-$pkgrel" "$ver")" -gt 0 ]]; then
         newpackages+=("$pkg")
       elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
@@ -629,18 +652,18 @@ if [[ $option = search || $option = searchinstall ]]; then
   for package in "${packageargs[@]}"; do
     curl -LfGs --data-urlencode "arg=$package" "$RPCURL=search" | \
     jshon -Q -e results -a -e Name -u -p -e Version -u -p -e NumVotes -u -p -e Description -u | \
-    sed 's/^$/-/' |  paste -s -d "\t\t\t\n" | sort -nr -k 3 > "$tmpdir/$package.search" &
+    sed 's/^$/-/' |  paste -s -d "\t\t\t\n" | sort -nr -k 3 > "$cachedir/$package.search" &
   done
   wait
-  cp "$tmpdir/${packageargs[0]}.search" "$tmpdir/search.results"
+  cp "$cachedir/${packageargs[0]}.search" "$cachedir/search.results"
   for ((i=1 ; i<${#packageargs[@]} ; i++)); do
-    grep -xFf "$tmpdir/search.results" "$tmpdir/${packageargs[$i]}.search" > "$tmpdir/search.results-2"
-    mv "$tmpdir/search.results-2" "$tmpdir/search.results"
+    grep -xFf "$cachedir/search.results" "$cachedir/${packageargs[$i]}.search" > "$cachedir/search.results-2"
+    mv "$cachedir/search.results-2" "$cachedir/search.results"
   done
-  sed -i '/^$/d' "$tmpdir/search.results"
+  sed -i '/^$/d' "$cachedir/search.results"
 
   # Prepare tmp file and arrays
-  IFS=$'\n' read -rd '' -a aurname < <(cut -f 1 "$tmpdir/search.results")
+  IFS=$'\n' read -rd '' -a aurname < <(cut -f 1 "$cachedir/search.results")
   aurtotal="${#aurname[@]}"
   alltotal="$(($pactotal+$aurtotal))"
   # Echo out the -Ss formatted package information
@@ -649,15 +672,15 @@ if [[ $option = search || $option = searchinstall ]]; then
   if [[ $option = search ]]; then
     if [[ $quiet ]]; then
       printf "%s\n" ${aurname[@]}
-    elif [[ -s "$tmpdir/search.results" ]]; then
-      printf "${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(cat "$tmpdir/search.results")
+    elif [[ -s "$cachedir/search.results" ]]; then
+      printf "${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(cat "$cachedir/search.results")
     fi
   else
     # interactive
     if [[ $quiet ]]; then
-      nl -v ${pactotal:-0} -w 1 -s ' ' <(cut -f 1 "$tmpdir/search.results")
-    elif [[ -s "$tmpdir/search.results" ]]; then
-      printf "%d ${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(nl -v ${pactotal:-0} -w 1 < "$tmpdir/search.results")
+      nl -v ${pactotal:-0} -w 1 -s ' ' <(cut -f 1 "$cachedir/search.results")
+    elif [[ -s "$cachedir/search.results" ]]; then
+      printf "%d ${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(nl -v ${pactotal:-0} -w 1 < "$cachedir/search.results")
     fi
   fi | fmt -"$_WIDTH" -s
   unset IFS
@@ -692,8 +715,8 @@ if [[ $option = search || $option = searchinstall ]]; then
   fi
 
   # Remove the tmpfiles
-  rm -f "$tmpdir/*search" &>/dev/null
-  rm -f "$tmpdir/search.result" &>/dev/null
+  rm -f "$cachedir/*search" &>/dev/null
+  rm -f "$cachedir/search.result" &>/dev/null
   exit
 fi
 
@@ -713,8 +736,8 @@ if [[ $option = info ]]; then
       exit
     else # Check to see if it is in the aur
       pkginfo "$package"
-      [[ -s "$tmpdir/$package.PKGBUILD" ]] || err "${COLOR7}error:${ENDCOLOR} package '$package' was not found"
-      . "$tmpdir/$package.PKGBUILD"
+      [[ -s "$cachedir/$package.PKGBUILD" ]] || err "${COLOR7}error:${ENDCOLOR} package '$package' was not found"
+      . "$cachedir/$package.PKGBUILD"
 
       # Echo out the -Si formatted package information
       # Retrieve each element in order and echo them immediately
