@@ -15,11 +15,9 @@
 
 [[ $PACMAN ]] || PACMAN="pacman"
 
-# set tmpfile stuff, clean tmpdir
-tmpdir="${TMPDIR:-/tmp}/packertmp-$UID"
-rm -rf "$tmpdir" &>/dev/null
-mkdir -p "$tmpdir"
-
+# configuration files
+packerconf='/etc/packer.conf'
+userpackerconf="$HOME/.packer.conf"
 makepkgconf='/etc/makepkg.conf'
 usermakepkgconf="$HOME/.makepkg.conf"
 pacmanconf='/etc/pacman.conf'
@@ -81,6 +79,12 @@ runasroot() {
     echo -n "root "
     su -c "$(printf '%q ' "$@")"
   fi
+}
+
+# Source packer.conf file
+sourcepackerconf() {
+  [[ -r "$packerconf" ]] && . "$packerconf"
+  [[ -r "$userpackerconf" ]] && . "$userpackerconf"
 }
 
 # Source makepkg.conf file
@@ -451,6 +455,18 @@ nap() {
     jobs > /dev/null
   done
 }
+
+# load packer.conf
+sourcepackerconf
+if [[ -n $PACKERTMPDIR ]]; then
+	tmpdir="$PACKERTMPDIR"
+else
+	tmpdir="${TMPDIR:-/tmp}/packertmp-$UID"
+fi
+
+# set tmpfile stuff, clean tmpdir
+rm -rf "$tmpdir" &>/dev/null
+mkdir -p "$tmpdir"
 
 # Argument parsing
 [[ $1 ]] || usage
