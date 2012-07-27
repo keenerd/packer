@@ -283,7 +283,8 @@ aurinstall() {
     mkdir -p "$dir"
     cd "$dir"
     curl -Lfs "$(pkglink $1)" > "$1.tar.gz"
-    tar xf "$1.tar.gz"
+    mkdir "$1"
+    tar xf "$1.tar.gz" -C "$1" --strip-components=1
     cd "$1"
 
     # customizepkg
