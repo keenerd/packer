@@ -614,12 +614,11 @@ if [[ $option = search || $option = searchinstall ]]; then
   # Aur searching and tmpfile preparation
   for package in "${packageargs[@]}"; do
     curl -LfGs --data-urlencode "arg=$package" "$RPCURL=search" | \
-    package="${package//\//-}" 
     jshon -Q -e results -a -e Name -u -p -e Version -u -p -e NumVotes -u -p -e Description -u | \
     sed 's/^$/-/' |  paste -s -d "\t\t\t\n" | sort -nr -k 3 > "$tmpdir/$package.search" &
   done
   wait
-  cp "$tmpdir/${packageargs[0]//\//-}.search" "$tmpdir/search.results"
+  cp "$tmpdir/${packageargs[0]}.search" "$tmpdir/search.results"
   for ((i=1 ; i<${#packageargs[@]} ; i++)); do
     grep -xFf "$tmpdir/search.results" "$tmpdir/${packageargs[$i]}.search" > "$tmpdir/search.results-2"
     mv "$tmpdir/search.results-2" "$tmpdir/search.results"
