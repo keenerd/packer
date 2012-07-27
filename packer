@@ -283,7 +283,8 @@ aurinstall() {
     mkdir -p "$dir"
     cd "$dir"
     curl -Lfs "$(pkglink $1)" > "$1.tar.gz"
-    tar xf "$1.tar.gz"
+    mkdir "$1"
+    tar xf "$1.tar.gz" -C "$1" --strip-components=1
     cd "$1"
 
     # customizepkg
@@ -583,7 +584,8 @@ if [[ $option = download ]]; then
 
   for package in "${pkglist[@]}"; do
     curl -Lfs "$(pkglink $package)" > "$package.tar.gz"
-    tar xf "$package.tar.gz" 
+    mkdir "$package"
+    tar xf "$package.tar.gz" -C "$package" --strip-components=1
   done
 fi
 
@@ -612,11 +614,14 @@ if [[ $option = search || $option = searchinstall ]]; then
   # Aur searching and tmpfile preparation
   for package in "${packageargs[@]}"; do
     curl -LfGs --data-urlencode "arg=$package" "$RPCURL=search" | \
+    echo $package
+    package="${package//\//-}" 
+    echo $package
     jshon -Q -e results -a -e Name -u -p -e Version -u -p -e NumVotes -u -p -e Description -u | \
     sed 's/^$/-/' |  paste -s -d "\t\t\t\n" | sort -nr -k 3 > "$tmpdir/$package.search" &
   done
   wait
-  cp "$tmpdir/${packageargs[0]}.search" "$tmpdir/search.results"
+  cp "$tmpdir/${packageargs[0]//\//-}.search" "$tmpdir/search.results"
   for ((i=1 ; i<${#packageargs[@]} ; i++)); do
     grep -xFf "$tmpdir/search.results" "$tmpdir/${packageargs[$i]}.search" > "$tmpdir/search.results-2"
     mv "$tmpdir/search.results-2" "$tmpdir/search.results"
