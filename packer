@@ -588,7 +588,7 @@ if [[ $option = download ]]; then
 
   for package in "${pkglist[@]}"; do
     curl -Lfs "$(pkglink $package)" > "$package.tar.gz"
-    if [[ $noextract  == '1' ]]; then
+    if [[ $noextract ]]; then
       continue
     else
       mkdir "$package"
@@ -613,7 +613,7 @@ if [[ $option = downloaddeps ]]; then
 
   for package in "${pkglist[@]}"; do
     curl -Lfs "$(pkglink $package)" > "$package.tar.gz"
-    if [[ $noextract  == '1' ]]; then
+    if [[ $noextract ]]; then
       continue
     else
       if [[ $package != '' ]]; then
