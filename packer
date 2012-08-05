@@ -616,8 +616,10 @@ if [[ $option = downloaddeps ]]; then
     if [[ $noextract  == '1' ]]; then
       continue
     else
-      mkdir "$package"
-      tar xf "$package.tar.gz" -C "$package" --strip-components=1
+      if [[ $package != '' ]]; then
+        mkdir "$package"
+        tar xf "$package.tar.gz" -C "$package" --strip-components=1
+      fi
     fi
   done
 fi
