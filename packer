@@ -653,9 +653,7 @@ if [[ $option = search || $option = searchinstall ]]; then
   # Aur searching and tmpfile preparation
   for package in "${packageargs[@]}"; do
     curl -LfGs --data-urlencode "arg=$package" "$RPCURL=search" | \
-    echo $package
     package="${package//\//-}"
-    echo $package
     jshon -Q -e results -a -e Name -u -p -e Version -u -p -e NumVotes -u -p -e Description -u | \
     sed 's/^$/-/' |  paste -s -d "\t\t\t\n" | sort -nr -k 3 > "$cachedir/$package.search" &
   done
