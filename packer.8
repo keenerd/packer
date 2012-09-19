@@ -53,6 +53,11 @@ Show information for a package\&.
 Download and extract AUR package tarballs, but don\(cqt install anything\&.
 .RE
 .PP
+\fB\-P\fR
+.RS 4
+Purge cache content\&.
+.RE
+.PP
 \fB\-h\fR
 .RS 4
 Show packer usage\&.
@@ -197,7 +202,24 @@ packer \fIname\fR
 .RE
 .SH "CONFIGURATION"
 .sp
-Packer uses these settings in /etc/pacman\&.conf:
+Optionally, packer uses these settings sourced from global configuration
+file in /etc/packer\&.conf or from user's file in ~/.packer.conf:
+.sp
+\fBPACKER_CACHEDIR\fR
+.RS 4
+.sp
+Cache directory where packages are downloaded and built\&. If not specified,
+the TMPDIR variable is used if defined, otherwise cache is created
+in /tmp/packertmp-$UID\&.
+.RE
+.PP
+\fBPACKER_KEEP_CACHE\fR
+.RS 4
+.sp
+Flag indicates if cache should be persistent, false by default\&.
+.RE
+.PP
+Packer also uses these settings in /etc/pacman\&.conf:
 .sp
 .RS 4
 .ie n \{\
@@ -213,11 +235,11 @@ IgnorePkg
 Packer output will be colorized unless the environmental variable COLOR is set to `NO'.
 .sp
 To manually edit files, packer uses the EDITOR variable\&. If EDITOR is not set then the default editor is vi\&.
-.sp
-Packages are built in the TMPDIR path\&. If the TMPDIR variable is not set then the default path is /tmp
 .SH "SEE ALSO"
 .sp
 \fBpacman\fR(8)
 .SH "AUTHORS"
 .sp
 Matthew Bruenig <matthewbruenig@gmail\&.com>
+.sp
+Mateusz Loskot <mateusz@loskot\&.net> - packan.conf and configurable cache support
