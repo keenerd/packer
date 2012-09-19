@@ -69,6 +69,7 @@ usage() {
   echo '    --auronly   - only do actions for aur'
   echo '    --devel     - update devel packages during -Su'
   echo '    --skipinteg - when using makepkg, do not check md5s'
+  echo '    --preview   - edit pkgbuild before sourcing'
   echo '    -h          - outputs this message'
   exit
 }
@@ -136,7 +137,7 @@ existsinlocal() {
 
 # Scrapes the aur deps from PKGBUILDS and puts in globally available dependencies array
 scrapeaurdeps() {
-  pkginfo "$1"
+  pkginfo "$1" "$preview"
   . "$cachedir/$1.PKGBUILD"
   IFS=$'\n'
   dependencies=( $(echo -e "${depends[*]}\n${makedepends[*]}" | sed -e 's/=.*//' -e 's/>.*//' -e 's/<.*//'| sort -u) )
@@ -242,10 +243,17 @@ pkglink() {
   echo "${PKGURL}$(jshon -Q -e results -e URLPath -u < "$cachedir/$1.info")"
 }
 
+# downloads pkgbuild ($1), edits if $2 is set
 pkginfo() {
   if ! [[ -f "$cachedir/$1.PKGBUILD" ]]; then
     pkgpath=$(pkglink $1)
     curl -Lfs "${pkgpath%/*}/PKGBUILD" > "$cachedir/$1.PKGBUILD"
+    if [[ $2 ]]; then
+      # rename for syntax highlighting
+      ln -sf "$cachedir/$1.PKGBUILD" "$cachedir/PKGBUILD"
+      confirm_edit "${COLOR6}Edit $1 PKGBUILD with \$EDITOR? [Y/n]${ENDCOLOR} " "$cachedir/PKGBUILD"
+      rm -f "$cachedir/PKGBUILD"
+    fi
   fi
 }
 
@@ -294,7 +302,9 @@ aurinstall() {
     mkdir "$1"
     tar xf "$1.tar.gz" -C "$1" --strip-components=1
     cd "$1"
-
+    if [[ $preview &&  -s "$tmpdir/$1.PKGBUILD" ]]; then
+      cp "$tmpdir/$1.PKGBUILD" PKGBUILD
+    fi
     # customizepkg
     if [[ -f "/etc/customizepkg.d/$1" ]] && type -t customizepkg &>/dev/null; then
       echo "Applying customizepkg instructions..."
@@ -489,6 +499,7 @@ while [[ $1 ]]; do
     '--auronly') auronly='1' ;;
     '--devel') devel='1' ;;
     '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
+    '--preview') preview='1' ;;
     '--') shift ; packageargs+=("$@") ; break ;;
     -*) echo "packer: Option \`$1' is not valid." ; exit 5 ;;
     *) packageargs+=("$1") ;;
@@ -737,7 +748,7 @@ if [[ $option = info ]]; then
       echo -e "$results"
       exit
     else # Check to see if it is in the aur
-      pkginfo "$package"
+      pkginfo "$package" "$preview"
       [[ -s "$cachedir/$package.PKGBUILD" ]] || err "${COLOR7}error:${ENDCOLOR} package '$package' was not found"
       . "$cachedir/$package.PKGBUILD"
 
