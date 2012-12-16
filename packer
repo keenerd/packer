@@ -104,7 +104,7 @@ isignored() {
 # Tests whether $1 exists on the aur
 existsinaur() {
   rpcinfo "$1"
-  [[ "$(jshon -Qe type -u < "$tmpdir/$1.info")" = "info" ]]
+  [[ "$(jshon -Qe resultcount -u < "$tmpdir/$1.info")" != "0" ]]
 }
 
 # Tests whether $1 exists in pacman
@@ -281,13 +281,14 @@ confirm_edit() {
 # Installs packages from aur ($1 is package, $2 is dependency or explicit)
 aurinstall() {
   dir="${TMPDIR:-/tmp}/packerbuild-$UID/$1"
+  sourcemakepkgconf
 
   # Prepare the installation directory
   # If there is an old directory and aurversion is not newer, use old directory
   if . "$dir/$1/PKGBUILD" &>/dev/null && ! aurversionisnewer "$1" "$pkgver-$pkgrel"; then
     cd "$dir/$1"
   else
-    [[ -d $dir ]] && rm -rf $dir
+    [[ -d "$dir" ]] && rm -rf "$dir"
     mkdir -p "$dir"
     cd "$dir"
     curl -Lfs "$(pkglink $1)" > "$1.tar.gz"
