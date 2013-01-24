@@ -59,7 +59,7 @@ usage() {
   echo '    -Ss|-Ssq    - searches for package'
   echo '    -Si         - outputs info for package'
   echo '    -G          - download and extract aur tarball only'
-  echo '    -A			- when using makepkg, ignores missing or incomplete arch field in the build script'
+  echo '    -A          - when using makepkg, ignores missing or incomplete arch field in the build script'
   echo
   echo '    --quiet     - only output package name for searches'
   echo '    --ignore    - takes a comma-separated list of packages to ignore'
