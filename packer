@@ -615,7 +615,7 @@ if [[ $option = search || $option = searchinstall ]]; then
     if [[ $option = search ]]; then
       echo -e "$results" | fmt -"$_WIDTH" -s
     else  # interactive
-      echo -e "$results" | fmt -"$_WIDTH" -s | nl -v 0 -w 1 -s ' ' -b 'p^[^ ]'
+      echo -e "$results" | nl -v 0 -w 1 -s ' ' -b 'p^[^ ]' | fmt -"$_WIDTH" -s 
     fi | sed '/^$/d'
     pacname=( $(pacman -Ssq -- "${packageargs[@]}") )
     pactotal="${#pacname[@]}"
