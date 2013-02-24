@@ -54,21 +54,22 @@ err() {
 usage() {
   echo 'usage: packer [option] [package] [package] [...]'
   echo
-  echo '    -S          - installs package'
-  echo '    -Syu|-Su    - updates all packages, also takes -uu and -yy options'
-  echo '    -Ss|-Ssq    - searches for package'
-  echo '    -Si         - outputs info for package'
-  echo '    -G          - download and extract aur tarball only'
+  echo '    -S           - installs package'
+  echo '    -Syu|-Su     - updates all packages, also takes -uu and -yy options'
+  echo '    -Ss|-Ssq     - searches for package'
+  echo '    -Si          - outputs info for package'
+  echo '    -G           - download and extract aur tarball only'
   echo
-  echo '    --quiet     - only output package name for searches'
-  echo '    --ignore    - takes a comma-separated list of packages to ignore'
-  echo '    --noconfirm - do not prompt for any confirmation'
-  echo '    --noedit    - do not prompt to edit files'
-  echo '    --auronly   - only do actions for aur'
-  echo '    --devel     - update devel packages during -Su'
-  echo '    --skipinteg - when using makepkg, do not check md5s'
-  echo '    --preview   - edit pkgbuild before sourcing'
-  echo '    -h          - outputs this message'
+  echo '    --quiet      - only output package name for searches'
+  echo '    --ignore     - takes a comma-separated list of packages to ignore'
+  echo '    --noconfirm  - do not prompt for any confirmation'
+  echo '    --noedit     - do not prompt to edit files'
+  echo '    --quickcheck - check for updates and exit'
+  echo '    --auronly    - only do actions for aur'
+  echo '    --devel      - update devel packages during -Su'
+  echo '    --skipinteg  - when using makepkg, do not check md5s'
+  echo '    --preview    - edit pkgbuild before sourcing'
+  echo '    -h           - outputs this message'
   exit
 }
 
@@ -447,6 +448,32 @@ installhandling() {
   done
 }
 
+run_quick_check() {
+  bigurl="https://aur.archlinux.org/rpc.php?type=multiinfo"
+  for p in $(pacman -Qqm); do
+    bigurl="$bigurl&arg\[\]=$p"
+  done
+  parsed_aur="$(curl -s "$bigurl" | \
+    jshon -e results -a -e Name -u -p -e Version -u | \
+    sed 's/^$/-/' | paste -s -d '\t\n' | sort)"
+  packages="$(expac -Q '%n\t%v' | sort)"
+  comm -23 <(echo "$parsed_aur") <(echo "$packages") | cut -f 1
+  if [[ $auronly == 1 ]]; then
+    return
+  fi
+  # see https://mailman.archlinux.org/pipermail/pacman-dev/2011-October/014673.html
+  # (note to self, get that merged already...)
+  if [[ -z $CHECKUPDATE_DB ]]; then
+    CHECKUPDATE_DB="${TMPDIR:-/tmp}/checkup-db-${USER}/"
+  fi
+  eval $(awk '/DBPath/ {print $1$2$3}' $pacmanconf)
+  DBPath="${DBPath:-/var/lib/pacman/}"
+  mkdir -p "$CHECKUPDATE_DB"
+  ln -s "${DBPath}/local" "$CHECKUPDATE_DB" &> /dev/null
+  fakeroot pacman -Sqy --dbpath "$CHECKUPDATE_DB" &> /dev/null
+  pacman -Qqu --dbpath "$CHECKUPDATE_DB" 2> /dev/null 
+}
+
 # proceed with installation prompt
 proceed() {
   read -n 1
@@ -481,6 +508,7 @@ while [[ $1 ]]; do
     '--noconfirm') noconfirm='1' PACOPTS+=("--noconfirm");;
     '--noedit') noedit='1' ;;
     '--auronly') auronly='1' ;;
+    '--quickcheck') quickcheck='1' ;;
     '--devel') devel='1' ;;
     '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
     '--preview') preview='1' ;;
@@ -490,6 +518,12 @@ while [[ $1 ]]; do
   esac
   shift
 done
+
+# check for new packages
+if [[ $quickcheck == 1 ]]; then
+  run_quick_check
+  exit
+fi
 
 # Sanity checks
 [[ $option ]] || option="searchinstall"
