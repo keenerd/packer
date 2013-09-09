@@ -476,7 +476,7 @@ run_quick_check() {
 
 # proceed with installation prompt
 proceed() {
-  read -n 1
+  read
   echo
   case "$REPLY" in
     'Y'|'y'|'') return 0 ;;
