@@ -28,7 +28,7 @@ version="0.5"
 [[ $PACMAN ]] || PACMAN="pacman"
 
 # set tmpfile stuff, clean tmpdir
-tmpdir="${TMPDIR:-/tmp}/packertmp-$UID"
+tmpdir="${TMPDIR:-/tmp}/apacmantmp-$UID"
 rm -rf "$tmpdir" &>/dev/null
 mkdir -p "$tmpdir"
 
@@ -65,7 +65,7 @@ err() {
 }
 
 usage() {
-  echo 'usage: packer [option] [package] [package] [...]'
+  echo 'usage: apacman [option] [package] [package] [...]'
   echo
   echo '    -S           - installs package'
   echo '    -Syu|-Su     - updates all packages, also takes -uu and -yy options'
@@ -562,7 +562,7 @@ while [[ $1 ]]; do
     '--ignorearch') MAKEPKGOPTS+=("--ignorearch");;
     '--preview') preview='1' ;;
     '--') shift ; packageargs+=("$@") ; break ;;
-    -*) echo "packer: Option \`$1' is not valid." ; exit 5 ;;
+    -*) echo "apacman: Option \`$1' is not valid." ; exit 5 ;;
     *) packageargs+=("$1") ;;
   esac
   shift
