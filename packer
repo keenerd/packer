@@ -1,4 +1,16 @@
 #!/bin/bash
+######################################################################
+# apacman - AUR wrapper forked from packer
+version="0.5"
+# Copyright OS Hazard <oshazard+aur@gmail.com>
+#
+# New Features:
+# * Saves AUR packages to /var/cache/apacman/pkg
+# * --needed does not install up-to-date packages
+# * --ignorearch ignores architectures specified in PKGBUILD
+# * partial passthrough for -R, -Q, and -U parameters
+######################################################################
+
 # Copyright Matthew Bruenig <matthewbruenig@gmail.com>
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,6 +35,7 @@ mkdir -p "$tmpdir"
 makepkgconf='/etc/makepkg.conf'
 usermakepkgconf="$HOME/.makepkg.conf"
 pacmanconf='/etc/pacman.conf'
+saveDir='/var/cache/apacman/pkg'
 
 RPCURL="https://aur.archlinux.org/rpc.php?type"
 PKGURL="https://aur.archlinux.org"
@@ -59,6 +72,9 @@ usage() {
   echo '    -Ss|-Ssq     - searches for package'
   echo '    -Si          - outputs info for package'
   echo '    -G           - download and extract aur tarball only'
+  echo
+  echo '    --needed     - do not install up-to-date packages'
+  echo '    --ignorearch - ignore a missing or incomplete architecture field'
   echo
   echo '    --quiet      - only output package name for searches'
   echo '    --ignore     - takes a comma-separated list of packages to ignore'
@@ -281,7 +297,7 @@ confirm_edit() {
 
 # Installs packages from aur ($1 is package, $2 is dependency or explicit)
 aurinstall() {
-  dir="${TMPDIR:-/tmp}/packerbuild-$UID/$1"
+  dir="${TMPDIR:-/tmp}/pkgbuild-$UID/$1"
   sourcemakepkgconf
 
   # Prepare the installation directory
@@ -325,6 +341,13 @@ aurinstall() {
   fi
 
   [[ $? -ne 0 ]] && echo "The build failed." && return 1
+
+  if [ ! -d $saveDir ]; then
+    runasroot mkdir -p $saveDir
+  fi
+  runasroot cp $pkgname-*$PKGEXT $saveDir/
+  echo "Saved: $(ls $pkgname-*$PKGEXT)";
+
   if  [[ $2 = dependency ]]; then
     runasroot $PACMAN ${PACOPTS[@]} --asdeps -U $pkgname-*$PKGEXT
   elif [[ $2 = explicit ]]; then
@@ -391,7 +414,12 @@ installhandling() {
     if existsinlocal "$pkg"; then
       localversion="$(pacman -Qs "$pkg" | grep -F "local/$pkg" | cut -d ' ' -f 2)"
       if ! aurversionisnewer "$pkg" "$localversion"; then
-        echo -e "${COLOR6}warning:$ENDCOLOR $pkg-$localversion is up to date -- reinstalling"
+        if [ "$needed" = "1" ]; then
+          echo -e "${COLOR6}notice:$ENDCOLOR $pkg-$localversion is up to date -- skipping" 
+          aurtargets=(${aurtargets[@]/$pkg/});
+        else
+          echo -e "${COLOR6}warning:$ENDCOLOR $pkg-$localversion is up to date -- reinstalling"
+        fi
       fi
     fi
   done
@@ -415,6 +443,12 @@ installhandling() {
     IFS=$'\n' read -rd '' -a pacmandepends < \
       <(printf "%s\n" "${pacmandepends[@]}" | sort -u)
     echo -e "${COLOR6}Pacman Targets (${#pacmandepends[@]}):${ENDCOLOR} ${pacmandepends[@]}"
+  fi
+
+  # Sanity check
+  totalcount="$((${#aurdepends[@]}+${#aurtargets[@]}+${#pacmandepends[@]}))"
+  if [ "$totalcount" = "0" ]; then
+    echo -e "${COLOR5}==>$ENDCOLOR nothing to do"; exit 0;
   fi
 
   # Prompt to proceed
@@ -491,6 +525,16 @@ nap() {
   done
 }
 
+# Wrap pacman parameters
+pacwrap() {
+  if [[ $1 = -Q* ]]; then
+    $PACMAN "$@";
+  else
+    runasroot $PACMAN "$@";
+  fi;
+  exit 0;
+}
+
 # Argument parsing
 [[ $1 ]] || usage
 packageargs=()
@@ -502,15 +546,20 @@ while [[ $1 ]]; do
     '-Si') option=info ;;
     -S*u*) option=update ; pacmanarg="$1" ;;
     '-G') option=download ;;
+    -R*) pacwrap "$@" ;;
+    -Q*) pacwrap "$@" ;;
+    -U*) pacwrap "$@" ;;
     '-h'|'--help') usage ;;
     '--quiet') quiet='1' ;;
     '--ignore') ignorearg="$2" ; PACOPTS+=("--ignore" "$2") ; shift ;;
     '--noconfirm') noconfirm='1' PACOPTS+=("--noconfirm");;
+    '--needed') needed='1' PACOPTS+=("--needed");;
     '--noedit') noedit='1' ;;
     '--auronly') auronly='1' ;;
     '--quickcheck') quickcheck='1' ;;
     '--devel') devel='1' ;;
-    '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
+    '--skipinteg') MAKEPKGOPTS+=("--skipinteg");;
+    '--ignorearch') MAKEPKGOPTS+=("--ignorearch");;
     '--preview') preview='1' ;;
     '--') shift ; packageargs+=("$@") ; break ;;
     -*) echo "packer: Option \`$1' is not valid." ; exit 5 ;;
