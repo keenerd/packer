@@ -243,9 +243,9 @@ pkginfo() {
     curl -Lfs "${pkgpath%/*}/PKGBUILD" > "$tmpdir/$1.PKGBUILD"
     if [[ $2 ]]; then
       # rename for syntax highlighting
-      ln -sf "$tmpdir/$1.PKGBUILD" "$tmpdir/PKGBUILD"
+      cp "$tmpdir/$1.PKGBUILD" "$tmpdir/PKGBUILD"
       confirm_edit "${COLOR6}Edit $1 PKGBUILD with \$EDITOR? [Y/n]${ENDCOLOR} " "$tmpdir/PKGBUILD"
-      rm -f "$tmpdir/PKGBUILD"
+      mv "$tmpdir/PKGBUILD" "$tmpdir/$1.PKGBUILD"
     fi
   fi
 }
@@ -303,6 +303,13 @@ aurinstall() {
     if [[ -f "/etc/customizepkg.d/$1" ]] && type -t customizepkg &>/dev/null; then
       echo "Applying customizepkg instructions..."
       customizepkg --modify
+    fi
+  fi
+
+  # check for missing arch
+  if [[ ! " ${arch[@]} " =~ " any " ]]; then
+    if [[ ! " ${arch[@]} " =~ " ${CARCH} " ]]; then
+      echo -e "${COLOR6}warning:$ENDCOLOR $CARCH missing from arch array"
     fi
   fi
 
