@@ -427,7 +427,7 @@ installhandling() {
 
   # Install pacman dependencies
   if [[ $pacmandepends ]]; then
-    runasroot $PACMAN --noconfirm --asdeps -S -- "${pacmandepends[@]}" || err "Installation failed."
+    runasroot $PACMAN --asdeps -S -- "${pacmandepends[@]}" || err "Installation failed."
   fi 
 
   # Install aur dependencies
