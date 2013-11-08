@@ -1,13 +1,13 @@
 '\" t
-.\"     Title: packer
+.\"     Title: apacman
 .\"    Author: [see the "Authors" section]
 .\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
-.\"      Date: 03/27/2010
-.\"    Manual: Pacman Manual
-.\"    Source: Pacman
+.\"      Date: 11/07/2013
+.\"    Manual: apacman Manual
+.\"    Source: apacman
 .\"  Language: English
 .\"
-.TH "PACKER" "8" "03/27/2010" "Packer" "Packer Manual"
+.TH "APACMAN" "8" "11/07/2013" "apacman" "apacman Manual"
 .\" -----------------------------------------------------------------
 .\" * set default formatting
 .\" -----------------------------------------------------------------
@@ -19,13 +19,14 @@
 .\" * MAIN CONTENT STARTS HERE *
 .\" -----------------------------------------------------------------
 .SH "NAME"
-packer \- package manager utility for pacman repositories and the AUR
+apacman \- AUR wrapper forked from packer
 .SH "SYNOPSIS"
 .sp
-\fIpacman\fR <operation> [options] [packages]
+\fIapacman\fR <operation> [options] [packages]
 .SH "DESCRIPTION"
 .sp
-Packer is a bash wrapper for pacman and the AUR\&. It was designed to be a simple and very fast replacement for the basic functionality of yaourt\&. It allows you to install, update, search, and show information for any package in the main repositories and in the AUR\&. For other commands, such as removing packages, use pacman\&.
+apacman is a bash wrapper forked from packer for pacman and the ArchLinux User Repository (AUR)\&. It adds package saving functionality and some extra 
+pass-through options for makepkg and pacman. 
 .SH "OPERATIONS"
 .PP
 \fB\-Ss\fR
@@ -58,6 +59,26 @@ Download and extract AUR package tarballs, but don\(cqt install anything\&.
 Show packer usage\&.
 .RE
 .SH "OPTIONS"
+.PP
+\fB\-\-needed\fR
+.RS 4
+Does not install up-to-date packages\&.
+.RE
+.PP
+\fB\-\-ignorearch\fR
+.RS 4
+ignores architectures specified in PKGBUILD\&.
+.RE
+.PP
+\fB\-\-skipcache\fR
+.RS 4
+skips check for pre-built package in cache directory\&.
+.RE
+.PP
+\fB\-\-cachevcs\fR
+.RS 4
+installs cached VCS (git, svn, hg) packages newer than AUR PKGBUILDs\&.
+.RE
 .PP
 \fB\-\-ignore\fR <\'package\'>
 .RS 4
@@ -100,7 +121,7 @@ Always offer to edit the pkgbuild before sourcing it.  To always force preview, 
 .RE
 .SH "INTERACTIVE MODE"
 .sp
-Use packer without any operations or options to use the interactive mode\&. Packer will show a numbered list of search results\&. To install a package, enter the corresponding number\&.
+Use apacman without any operations or options to use the interactive mode\&. apacman will show a numbered list of search results\&. To install a package, enter the corresponding number\&.
 .SH "EXAMPLE USAGE"
 .sp
 .RS 4
@@ -112,7 +133,7 @@ Use packer without any operations or options to use the interactive mode\&. Pack
 .IP \(bu 2.3
 .\}
 Sync and update all packages:
-packer \-Syu
+apacman \-Syu
 .RE
 .sp
 .RS 4
@@ -124,7 +145,7 @@ packer \-Syu
 .IP \(bu 2.3
 .\}
 Update only AUR packages:
-packer \-Syu \-\-auronly
+apacman \-Syu \-\-auronly
 .RE
 .sp
 .RS 4
@@ -136,7 +157,7 @@ packer \-Syu \-\-auronly
 .IP \(bu 2.3
 .\}
 Update, and reinstall packages that were installed from a revision control source:
-packer \-Syu \-\-devel
+apacman \-Syu \-\-devel
 .RE
 .sp
 For a package called \fIname\fR:
@@ -150,7 +171,7 @@ For a package called \fIname\fR:
 .IP \(bu 2.3
 .\}
 Search:
-packer \-Ss \fIname\fR
+apacman \-Ss \fIname\fR
 .RE
 .sp
 .RS 4
@@ -162,7 +183,7 @@ packer \-Ss \fIname\fR
 .IP \(bu 2.3
 .\}
 Install:
-packer \-S \fIname\fR
+apacman \-S \fIname\fR
 .RE
 .sp
 .RS 4
@@ -174,7 +195,7 @@ packer \-S \fIname\fR
 .IP \(bu 2.3
 .\}
 Install without confirmations:
-packer \-S \-\-noconfirm \fIname\fR
+apacman \-S \-\-noconfirm \fIname\fR
 .RE
 .sp
 .RS 4
@@ -186,7 +207,7 @@ packer \-S \-\-noconfirm \fIname\fR
 .IP \(bu 2.3
 .\}
 Get information about a package:
-packer \-Si \fIname\fR
+apacman \-Si \fIname\fR
 .RE
 .sp
 .RS 4
@@ -198,11 +219,23 @@ packer \-Si \fIname\fR
 .IP \(bu 2.3
 .\}
 Search and install in interactive mode:
-packer \fIname\fR
+apacman \fIname\fR
 .RE
 .SH "CONFIGURATION"
 .sp
-Packer uses these settings in /etc/pacman\&.conf:
+apacman defaults to saving succesfully built packages to /var/cache/apacman/pkg.
+.sp
+apacman uses the AUR package cache directory if applicable (unless \-\-skipcache parameter)
+.sp
+By default VCS package versions are compared via PKGBUILD in AUR (unless \-\-cachevcs parameter)
+.sp
+apacman output will be colorized unless the environmental variable COLOR is set to `NO'.
+.sp
+To manually edit files, packer uses the EDITOR variable\&. If EDITOR is not set then the default editor is vi\&.
+.sp
+Packages are built in the TMPDIR path\&. If the TMPDIR variable is not set then the default path is /tmp
+.sp
+apacman uses these settings in /etc/pacman\&.conf:
 .sp
 .RS 4
 .ie n \{\
@@ -214,15 +247,13 @@ Packer uses these settings in /etc/pacman\&.conf:
 .\}
 IgnorePkg
 .RE
-.sp
-Packer output will be colorized unless the environmental variable COLOR is set to `NO'.
-.sp
-To manually edit files, packer uses the EDITOR variable\&. If EDITOR is not set then the default editor is vi\&.
-.sp
-Packages are built in the TMPDIR path\&. If the TMPDIR variable is not set then the default path is /tmp
 .SH "SEE ALSO"
 .sp
 \fBpacman\fR(8)
+.sp
+\fBpacker\fR(8)
 .SH "AUTHORS"
+.sp
+OS Hazard <oshazard+apacman@gmail\&.com>
 .sp
 Matthew Bruenig <matthewbruenig@gmail\&.com>
