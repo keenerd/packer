@@ -367,8 +367,10 @@ installhandling() {
   for package in "${aurpackages[@]}"; do
     if isignored "$package"; then
       echo -ne "${COLOR5}:: ${COLOR1}$package is in IgnorePkg/IgnoreGroup. Install anyway?${ENDCOLOR} [Y/n] "
-      if [[ -z "$noconfirm" && $(! proceed) ]]; then
-        continue
+      if ! [[ $noconfirm ]]; then
+        proceed || continue
+      else
+        echo
       fi
     fi
     aurtargets+=("$package")
@@ -378,10 +380,14 @@ installhandling() {
   for package in "${aurdepends[@]}"; do
     if isignored "$package"; then
       echo -ne "${COLOR5}:: ${COLOR1}$package is in IgnorePkg/IgnoreGroup. Install anyway?${ENDCOLOR} [Y/n] "
-      if [[ -z "$noconfirm" && $(! proceed) ]]; then
+      if ! [[ $noconfirm ]]; then
+        if ! proceed; then
           echo "Unresolved dependency \`$package'"
           unset aurtargets
           break
+        fi
+      else
+        echo
       fi
     fi
   done
