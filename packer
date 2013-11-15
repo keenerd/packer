@@ -619,7 +619,7 @@ if [[ $option = update ]]; then
   # Check and output ignored package update info
   for package in "${checkignores[@]}"; do
     if aurversionisnewer "${package%% *}" "${package##* }"; then
-      echo -e "${COLOR6}warning:${ENDCOLOR} $package: ignoring package upgrade (${package##* } => $aurversion)"
+      echo -e "${COLOR6}warning:${ENDCOLOR} ${package%% *}: ignoring package upgrade (${package##* } => $aurversion)"
     fi
   done
 
