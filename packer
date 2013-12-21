@@ -187,13 +187,16 @@ aurbar() {
   # Get vars for output
   beginline=" aur"
   beginbar="["
-  endbar="] "
+  endbar="]"
   perc="$(($1*100/$2))"
   width="$(stty size)"
   width="${width##* }"
-  charsbefore="$((${#beginline}+${#1}+${#2}+${#beginbar}+3))"
-  spaces="$((51-$charsbefore))"
-  barchars="$(($width-51-7))"
+  infolen="$(($width*6/10))"
+  [ $infolen -lt 50 ] && infolen=50
+  
+  charsbefore="$((${#beginline}+${#1}+${#2}+3))"
+  spaces="$(($infolen-$charsbefore))"
+  barchars="$(($width-$infolen-${#beginbar}-${#endbar}-6))"
   hashes="$(($barchars*$perc/100))" 
   dashes="$(($barchars-$hashes))"
 
@@ -222,7 +225,7 @@ aurbar() {
       printf "-"
     done
   fi
-  printf "%s%3s%%\r" ${endbar} ${perc}
+  printf "%s %3s%%\r" ${endbar} ${perc}
 }
 
 rpcinfo() {
