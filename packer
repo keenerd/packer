@@ -115,7 +115,9 @@ existsinpacman() {
 
 # Tests whether $1 is provided in pacman, sets globally accessibly providepkg var
 providedinpacman() {
+  unset providepkg
   IFS=$'\n' read -rd '' -a providepkg < <(pacman -Ssq -- "^$1$")
+  [[ -n $providepkg ]]
 }
 
 # Tests whether $1 exists in a pacman group
