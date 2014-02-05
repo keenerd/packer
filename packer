@@ -335,9 +335,9 @@ aurinstall() {
 
   [[ $? -ne 0 ]] && echo "The build failed." && return 1
   if  [[ $2 = dependency ]]; then
-    runasroot $PACMAN ${PACOPTS[@]} --asdeps -U $pkgname-*$PKGEXT
+    runasroot $PACMAN ${PACOPTS[@]} --asdeps -U $pkgname-$pkgver-$pkgrel*$PKGEXT
   elif [[ $2 = explicit ]]; then
-    runasroot $PACMAN ${PACOPTS[@]} -U $pkgname-*$PKGEXT
+    runasroot $PACMAN ${PACOPTS[@]} -U $pkgname-$pkgver-$pkgrel*$PKGEXT
   fi
 }
 
