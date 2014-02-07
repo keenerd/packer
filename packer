@@ -65,6 +65,7 @@ usage() {
   echo '    --noconfirm  - do not prompt for any confirmation'
   echo '    --noedit     - do not prompt to edit files'
   echo '    --quickcheck - check for updates and exit'
+  echo '    --force      - force install packages'
   echo '    --auronly    - only do actions for aur'
   echo '    --devel      - update devel packages during -Su'
   echo '    --skipinteg  - when using makepkg, do not check md5s'
@@ -524,6 +525,7 @@ while [[ $1 ]]; do
     '--noedit') noedit='1' ;;
     '--auronly') auronly='1' ;;
     '--quickcheck') quickcheck='1' ;;
+    '--force') PACOPTS+=("--force");;
     '--devel') devel='1' ;;
     '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
     '--preview') preview='1' ;;
