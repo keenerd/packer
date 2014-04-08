@@ -1,4 +1,4 @@
-packer-Postinstallerf
+packer-postinstallerf
 ======
 
 Bash wrapper for pacman and AUR.
