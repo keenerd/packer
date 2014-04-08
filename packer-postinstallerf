@@ -571,7 +571,7 @@ fi
 
 # Remove (-D) 
 if [[ $option = remove ]]; then
-  runasroot $PACMAN -Rs --noconfirm "${packageargs[@]}"
+  runasroot $PACMAN -Rs "${PACOPTS[@]}" "${packageargs[@]}"
 fi
 
 # Remove (-Dc) with graphical autentication
