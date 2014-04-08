@@ -1,7 +1,5 @@
 #!/bin/bash
-# A fork of packer https://github.com/keenerd/packer for PostInstallerF
-# http://sourceforge.net/projects/postinstaller/
-# Contact: https://plus.google.com/u/0/communities/118230919321773121406
+# Copyright Matthew Bruenig <matthewbruenig@gmail.com>
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
