@@ -66,6 +66,7 @@ usage() {
   echo '    --noedit     - do not prompt to edit files'
   echo '    --quickcheck - check for updates and exit'
   echo '    --auronly    - only do actions for aur'
+  echo '    --aurskip    - skip actions for aur'
   echo '    --devel      - update devel packages during -Su'
   echo '    --skipinteg  - when using makepkg, do not check md5s'
   echo '    --preview    - edit pkgbuild before sourcing'
@@ -353,7 +354,7 @@ installhandling() {
       pacmanpackages+=("$package")
     elif ! [[ $auronly ]] && existsinpacmangroup "$package"; then
       pacmanpackages+=("$package")
-    elif existsinaur "$package"; then
+    elif ! [[ $aurskip ]] && existsinaur "$package"; then
       if finddeps "$package"; then
         # here is where dep dupes are created
         aurpackages+=("$package")
@@ -523,6 +524,7 @@ while [[ $1 ]]; do
     '--noconfirm') noconfirm='1' PACOPTS+=("--noconfirm");;
     '--noedit') noedit='1' ;;
     '--auronly') auronly='1' ;;
+    '--aurskip') aurskip='1' ;;
     '--quickcheck') quickcheck='1' ;;
     '--devel') devel='1' ;;
     '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
@@ -543,6 +545,7 @@ fi
 # Sanity checks
 [[ $option ]] || option="searchinstall"
 [[ $option != "update" && -z $packageargs ]] && err "Must specify a package."
+[[ $aurskip = 1 && $auronly = 1 ]] && err "--auronly and --aurskip cannot both be enabled"
 
 # Install (-S) handling
 if [[ $option = install ]]; then
@@ -560,75 +563,77 @@ if [[ $option = update ]]; then
   fi
 
   # Aur update
-  echo -e "${COLOR5}:: ${COLOR1}Synchronizing aur database...${ENDCOLOR}"
-  IFS=$'\n' read -rd '' -a packages < <(pacman -Qm)
-  newpackages=()
-  checkignores=()
-  total="${#packages[@]}"
-  grep -q '^ *ILoveCandy' "$pacmanconf" && bartype='candy' || bartype='normal'
+  if ! [[ $aurskip ]]; then
+    echo -e "${COLOR5}:: ${COLOR1}Synchronizing aur database...${ENDCOLOR}"
+    IFS=$'\n' read -rd '' -a packages < <(pacman -Qm)
+    newpackages=()
+    checkignores=()
+    total="${#packages[@]}"
+    grep -q '^ *ILoveCandy' "$pacmanconf" && bartype='candy' || bartype='normal'
 
-  if [[ $devel ]]; then
-    for ((i=0; i<$total; i++)); do 
-      aurbar "$((i+1))" "$total" "$bartype"
-      pkg="${packages[i]%% *}"
-      if isignored "$pkg"; then
-        checkignores+=("${packages[i]}")
-        continue
+    if [[ $devel ]]; then
+      for ((i=0; i<$total; i++)); do 
+        aurbar "$((i+1))" "$total" "$bartype"
+        pkg="${packages[i]%% *}"
+        if isignored "$pkg"; then
+          checkignores+=("${packages[i]}")
+          continue
+        fi
+        pkginfo "$pkg" &
+        nap
+      done
+      wait
+      for ((i=0; i<$total; i++)); do 
+        pkg="${packages[i]%% *}"
+        ver="${packages[i]##* }"
+        if [[ ! -s "$tmpdir/$pkg.PKGBUILD" ]]; then
+          continue
+        fi
+        if isignored "$pkg"; then
+          continue
+        fi
+        unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
+        . "$tmpdir/$pkg.PKGBUILD"
+        if [[ "$(LC_ALL=C vercmp "$pkgver-$pkgrel" "$ver")" -gt 0 ]]; then
+          newpackages+=("$pkg")
+        elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
+          newpackages+=("$pkg")
+        fi
+      done
+    else
+      for ((i=0; i<$total; i++)); do 
+        aurbar "$((i+1))" "$total" "$bartype"
+        pkg="${packages[i]%% *}"
+        rpcinfo "$pkg" &
+        nap
+      done
+      wait
+      for ((i=0; i<$total; i++)); do
+        pkg="${packages[i]%% *}"
+        ver="${packages[i]##* }"
+        if isignored "$pkg"; then
+          checkignores+=("${packages[i]}")
+        elif aurversionisnewer "$pkg" "$ver"; then
+          newpackages+=("$pkg")
       fi
-      pkginfo "$pkg" &
-      nap
-    done
-    wait
-    for ((i=0; i<$total; i++)); do 
-      pkg="${packages[i]%% *}"
-      ver="${packages[i]##* }"
-      if [[ ! -s "$tmpdir/$pkg.PKGBUILD" ]]; then
-        continue
-      fi
-      if isignored "$pkg"; then
-        continue
-      fi
-      unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
-      . "$tmpdir/$pkg.PKGBUILD"
-      if [[ "$(LC_ALL=C vercmp "$pkgver-$pkgrel" "$ver")" -gt 0 ]]; then
-        newpackages+=("$pkg")
-      elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
-        newpackages+=("$pkg")
-      fi
-    done
-  else
-    for ((i=0; i<$total; i++)); do 
-      aurbar "$((i+1))" "$total" "$bartype"
-      pkg="${packages[i]%% *}"
-      rpcinfo "$pkg" &
-      nap
-    done
-    wait
-    for ((i=0; i<$total; i++)); do
-      pkg="${packages[i]%% *}"
-      ver="${packages[i]##* }"
-      if isignored "$pkg"; then
-        checkignores+=("${packages[i]}")
-      elif aurversionisnewer "$pkg" "$ver"; then
-        newpackages+=("$pkg")
+      done
     fi
+    echo
+
+    echo -e "${COLOR5}:: ${COLOR1}Starting full aur upgrade...${ENDCOLOR}"
+
+    # Check and output ignored package update info
+    for package in "${checkignores[@]}"; do
+      if aurversionisnewer "${package%% *}" "${package##* }"; then
+        echo -e "${COLOR6}warning:${ENDCOLOR} ${package%% *}: ignoring package upgrade (${package##* } => $aurversion)"
+      fi
     done
-  fi
-  echo
 
-  echo -e "${COLOR5}:: ${COLOR1}Starting full aur upgrade...${ENDCOLOR}"
-
-  # Check and output ignored package update info
-  for package in "${checkignores[@]}"; do
-    if aurversionisnewer "${package%% *}" "${package##* }"; then
-      echo -e "${COLOR6}warning:${ENDCOLOR} ${package%% *}: ignoring package upgrade (${package##* } => $aurversion)"
+    # Now for the installation part
+    if [[ $newpackages ]]; then
+      auronly='1'
+      installhandling "${newpackages[@]}"
     fi
-  done
-
-  # Now for the installation part
-  if [[ $newpackages ]]; then
-    auronly='1'
-    installhandling "${newpackages[@]}"
   fi
   echo " local database is up to date"
 fi
@@ -672,42 +677,44 @@ if [[ $option = search || $option = searchinstall ]]; then
     pactotal=0
   fi
 
-  # Aur searching and tmpfile preparation
-  for package in "${packageargs[@]}"; do
-    curl -LfGs --data-urlencode "arg=$package" "$RPCURL=search" | \
-    jshon -Q -e results -a -e Name -u -p -e Version -u -p -e NumVotes -u -p -e Description -u | \
-    sed 's/^$/-/' |  paste -s -d "\t\t\t\n" | sort -nr -k 3 > "$tmpdir/$package.search" &
-  done
-  wait
-  cp "$tmpdir/${packageargs[0]}.search" "$tmpdir/search.results"
-  for ((i=1 ; i<${#packageargs[@]} ; i++)); do
-    grep -xFf "$tmpdir/search.results" "$tmpdir/${packageargs[$i]}.search" > "$tmpdir/search.results-2"
-    mv "$tmpdir/search.results-2" "$tmpdir/search.results"
-  done
-  sed -i '/^$/d' "$tmpdir/search.results"
+  if ! [[ $aurskip ]]; then
+    # Aur searching and tmpfile preparation
+    for package in "${packageargs[@]}"; do
+      curl -LfGs --data-urlencode "arg=$package" "$RPCURL=search" | \
+      jshon -Q -e results -a -e Name -u -p -e Version -u -p -e NumVotes -u -p -e Description -u | \
+      sed 's/^$/-/' |  paste -s -d "\t\t\t\n" | sort -nr -k 3 > "$tmpdir/$package.search" &
+    done
+    wait
+    cp "$tmpdir/${packageargs[0]}.search" "$tmpdir/search.results"
+    for ((i=1 ; i<${#packageargs[@]} ; i++)); do
+      grep -xFf "$tmpdir/search.results" "$tmpdir/${packageargs[$i]}.search" > "$tmpdir/search.results-2"
+      mv "$tmpdir/search.results-2" "$tmpdir/search.results"
+    done
+    sed -i '/^$/d' "$tmpdir/search.results"
 
-  # Prepare tmp file and arrays
-  IFS=$'\n' read -rd '' -a aurname < <(cut -f 1 "$tmpdir/search.results")
-  aurtotal="${#aurname[@]}"
-  alltotal="$(($pactotal+$aurtotal))"
-  # Echo out the -Ss formatted package information
+    # Prepare tmp file and arrays
+    IFS=$'\n' read -rd '' -a aurname < <(cut -f 1 "$tmpdir/search.results")
+    aurtotal="${#aurname[@]}"
+    alltotal="$(($pactotal+$aurtotal))"
+    # Echo out the -Ss formatted package information
 
-  IFS=$'\t\n'
-  if [[ $option = search ]]; then
-    if [[ $quiet ]]; then
-      printf "%s\n" ${aurname[@]}
-    elif [[ -s "$tmpdir/search.results" ]]; then
-      printf "${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(cat "$tmpdir/search.results")
-    fi
-  else
-    # interactive
-    if [[ $quiet ]]; then
-      nl -v ${pactotal:-0} -w 1 -s ' ' <(cut -f 1 "$tmpdir/search.results")
-    elif [[ -s "$tmpdir/search.results" ]]; then
-      printf "%d ${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(nl -v ${pactotal:-0} -w 1 < "$tmpdir/search.results")
-    fi
-  fi | fmt -"$_WIDTH" -s
-  unset IFS
+    IFS=$'\t\n'
+    if [[ $option = search ]]; then
+      if [[ $quiet ]]; then
+        printf "%s\n" ${aurname[@]}
+      elif [[ -s "$tmpdir/search.results" ]]; then
+        printf "${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(cat "$tmpdir/search.results")
+      fi
+    else
+      # interactive
+      if [[ $quiet ]]; then
+        nl -v ${pactotal:-0} -w 1 -s ' ' <(cut -f 1 "$tmpdir/search.results")
+      elif [[ -s "$tmpdir/search.results" ]]; then
+        printf "%d ${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(nl -v ${pactotal:-0} -w 1 < "$tmpdir/search.results")
+      fi
+    fi | fmt -"$_WIDTH" -s
+    unset IFS
+  fi
 
   # Prompt and install selected numbers
   if [[ $option = searchinstall ]]; then
@@ -797,3 +804,4 @@ if [[ $option = info ]]; then
     fi
   done
 fi
+# vim: set shiftwidth=2 tabstop=2 softtabstop=2: 
