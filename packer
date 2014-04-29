@@ -55,6 +55,8 @@ usage() {
   echo 'usage: packer [option] [package] [package] [...]'
   echo
   echo '    -S           - installs package'
+  echo '    -L           - install locally package, requires specific path'
+  echo '    -Lc          - install locally package, with graphical autentication, requires specific path'
   echo '    -D           - uninstall package'
   echo '    -Dc          - uninstall package with graphical autentication'
   echo '    -Syu|-Su     - updates all packages, also takes -uu and -yy options'
@@ -527,6 +529,8 @@ packageargs=()
 while [[ $1 ]]; do
   case "$1" in
     '-S') option=install ;;
+    '-L') option=localinstall ;;
+    '-Lc') option=localinstall-gui ;;
     '-D') option=remove ;;
     '-Dc') option=remove-gui ;;
     '-Ss') option=search ;;
@@ -567,15 +571,29 @@ if [[ $option = install ]]; then
   exit
 fi
 
+# Install (-L) local
+if [[ $option = localinstall ]]; then
+  runasroot $PACMAN -U "${packageargs[@]}"
+  exit
+fi
+
+# Install (-Lc) local with graphical autentication
+if [[ $option = localinstall-gui ]]; then
+  runasrootgui $PACMAN -U --noconfirm "${packageargs[@]}"
+  exit
+fi
+
 # Remove (-D) 
 if [[ $option = remove ]]; then
   runasroot $PACMAN -Rs "${PACOPTS[@]}" "${packageargs[@]}"
+  exit
 fi
 
 # Remove (-Dc) with graphical autentication
 if [[ $option = remove-gui ]]; then
 #  zenity --password | sudo -S pacman -R --noconfirm "${packageargs[@]}"
   runasrootgui $PACMAN -Rs --noconfirm "${packageargs[@]}"
+  exit
 fi
 
 
