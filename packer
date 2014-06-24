@@ -562,6 +562,7 @@ if [[ $option = update ]]; then
   
   if [[ $mirrorlist ]]; then
     runasroot $PACMAN "-Syy"
+    exit 1
   fi
 
   # Aur update
