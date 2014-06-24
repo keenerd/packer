@@ -513,11 +513,11 @@ while [[ $1 ]]; do
   case "$1" in
     'install') option=install ;;
     'search') option=search ;;
-    '-Ssq'|'-Sqs') option=search ; quiet='1' ;;
-    '-Si') option=info ;;
-    -S*u*) option=update ; pacmanarg="$1" ;;
-    '-G') option=download ;;
-    '-h'|'--help') usage ;;
+    'info') option=info ;;
+    #-S*u*) option=update ; pacmanarg="$1" ;;
+    'update') option=update ; pacmanarg="-Su" ;;
+    'download') option=download ;;
+    'help') usage ;;
     '--quiet') quiet='1' ;;
     '--ignore') ignorearg="$2" ; PACOPTS+=("--ignore" "$2") ; shift ;;
     '--noconfirm') noconfirm='1' PACOPTS+=("--noconfirm");;
@@ -527,6 +527,7 @@ while [[ $1 ]]; do
     '--devel') devel='1' ;;
     '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
     '--preview') preview='1' ;;
+    '--mirror-list') mirrorlist='1' ;;
     '--') shift ; packageargs+=("$@") ; break ;;
     -*) echo "packer: Option \`$1' is not valid." ; exit 5 ;;
     *) packageargs+=("$1") ;;
@@ -557,6 +558,10 @@ if [[ $option = update ]]; then
   # Pacman update
   if ! [[ $auronly ]]; then
     runasroot $PACMAN "${PACOPTS[@]}" "$pacmanarg"
+  fi
+  
+  if [[ $mirrorlist ]]; then
+    runasroot $PACMAN "-Syy"
   fi
 
   # Aur update
