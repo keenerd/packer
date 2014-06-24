@@ -561,7 +561,7 @@ if [[ $option = update ]]; then
   fi
   
   if [[ $mirrorlist ]]; then
-    runasroot $PACMAN "-Syy"
+    runasroot "pacman -Syy"
     exit 1
   fi
 
