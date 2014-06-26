@@ -584,100 +584,101 @@ if [[ $option = update ]]; then
     exit 1
   fi
   
+  # Check for updates to Packer
   if ! [[ $updateself ]]; then
   
-  # Pacman update
-  if ! [[ $auronly ]]; then
-    echo -e "${COLOR5}:: ${COLOR1}Synchronizing ${COLOR2}arch${ENDCOLOR} ${COLOR1}database(s)...${ENDCOLOR}"
-    echo
-    runasroot $PACMAN "${PACOPTS[@]}" "$pacmanarg"
+    # Pacman update
+    if ! [[ $auronly ]]; then
+      echo -e "${COLOR5}:: ${COLOR1}Synchronizing ${COLOR2}arch${ENDCOLOR} ${COLOR1}database(s)...${ENDCOLOR}"
+      echo
+      runasroot $PACMAN "${PACOPTS[@]}" "$pacmanarg"
     
-  fi
-
-  # Aur update
-  echo -e "${COLOR5}:: ${COLOR1}Synchronizing ${COLOR2}aur${ENDCOLOR} database...${ENDCOLOR}"
-  echo
-  IFS=$'\n' read -rd '' -a packages < <(pacman -Qm)
-  newpackages=()
-  checkignores=()
-  total="${#packages[@]}"
-  grep -q '^ *ILoveCandy' "$pacmanconf" && bartype='candy' || bartype='normal'
-
-  if [[ $devel ]]; then
-    for ((i=0; i<$total; i++)); do 
-      aurbar "$((i+1))" "$total" "$bartype"
-      pkg="${packages[i]%% *}"
-      if isignored "$pkg"; then
-        checkignores+=("${packages[i]}")
-        continue
-      fi
-      pkginfo "$pkg" &
-      nap
-    done
-    wait
-    for ((i=0; i<$total; i++)); do 
-      pkg="${packages[i]%% *}"
-      ver="${packages[i]##* }"
-      if [[ ! -s "$tmpdir/$pkg.PKGBUILD" ]]; then
-        continue
-      fi
-      if isignored "$pkg"; then
-        continue
-      fi
-      unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
-      . "$tmpdir/$pkg.PKGBUILD"
-      if [[ "$(LC_ALL=C vercmp "$pkgver-$pkgrel" "$ver")" -gt 0 ]]; then
-        newpackages+=("$pkg")
-      elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
-        newpackages+=("$pkg")
-      fi
-    done
-  else
-    for ((i=0; i<$total; i++)); do 
-      aurbar "$((i+1))" "$total" "$bartype"
-      pkg="${packages[i]%% *}"
-      rpcinfo "$pkg" &
-      nap
-    done
-    wait
-    for ((i=0; i<$total; i++)); do
-      pkg="${packages[i]%% *}"
-      ver="${packages[i]##* }"
-      if isignored "$pkg"; then
-        checkignores+=("${packages[i]}")
-      elif aurversionisnewer "$pkg" "$ver"; then
-        newpackages+=("$pkg")
     fi
-    done
-  fi
-  echo
 
-  echo -e "${COLOR5}:: ${COLOR1}Starting full aur upgrade...${ENDCOLOR}"
+    # Aur update
+    echo -e "${COLOR5}:: ${COLOR1}Synchronizing ${COLOR2}aur${ENDCOLOR} database...${ENDCOLOR}"
+    echo
+    IFS=$'\n' read -rd '' -a packages < <(pacman -Qm)
+    newpackages=()
+    checkignores=()
+    total="${#packages[@]}"
+    grep -q '^ *ILoveCandy' "$pacmanconf" && bartype='candy' || bartype='normal'
 
-  # Check and output ignored package update info
-  for package in "${checkignores[@]}"; do
-    if aurversionisnewer "${package%% *}" "${package##* }"; then
-      echo -e "${COLOR6}warning:${ENDCOLOR} ${package%% *}: ignoring package upgrade (${package##* } => $aurversion)"
+    if [[ $devel ]]; then
+      for ((i=0; i<$total; i++)); do 
+        aurbar "$((i+1))" "$total" "$bartype"
+        pkg="${packages[i]%% *}"
+        if isignored "$pkg"; then
+          checkignores+=("${packages[i]}")
+          continue
+        fi
+        pkginfo "$pkg" &
+        nap
+      done
+      wait
+      for ((i=0; i<$total; i++)); do 
+        pkg="${packages[i]%% *}"
+        ver="${packages[i]##* }"
+        if [[ ! -s "$tmpdir/$pkg.PKGBUILD" ]]; then
+          continue
+        fi
+        if isignored "$pkg"; then
+          continue
+        fi
+        unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
+        . "$tmpdir/$pkg.PKGBUILD"
+        if [[ "$(LC_ALL=C vercmp "$pkgver-$pkgrel" "$ver")" -gt 0 ]]; then
+          newpackages+=("$pkg")
+        elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
+          newpackages+=("$pkg")
+        fi
+      done
+    else
+      for ((i=0; i<$total; i++)); do 
+        aurbar "$((i+1))" "$total" "$bartype"
+        pkg="${packages[i]%% *}"
+        rpcinfo "$pkg" &
+        nap
+      done
+      wait
+      for ((i=0; i<$total; i++)); do
+        pkg="${packages[i]%% *}"
+        ver="${packages[i]##* }"
+        if isignored "$pkg"; then
+          checkignores+=("${packages[i]}")
+        elif aurversionisnewer "$pkg" "$ver"; then
+          newpackages+=("$pkg")
+      fi
+      done
     fi
-  done
+    echo
 
-  # Now for the installation part
-  if [[ $newpackages ]]; then
-    auronly='1'
-    installhandling "${newpackages[@]}"
-  fi
-  echo " local database is up to date"
+    echo -e "${COLOR5}:: ${COLOR1}Starting full aur upgrade...${ENDCOLOR}"
+
+    # Check and output ignored package update info
+    for package in "${checkignores[@]}"; do
+      if aurversionisnewer "${package%% *}" "${package##* }"; then
+        echo -e "${COLOR6}warning:${ENDCOLOR} ${package%% *}: ignoring package upgrade (${package##* } => $aurversion)"
+      fi
+    done
+
+    # Now for the installation part
+    if [[ $newpackages ]]; then
+      auronly='1'
+      installhandling "${newpackages[@]}"
+    fi
+    echo " local database is up to date"
   
-fi ##
+  fi ##
   
   # Update packer
   if [[ $updateself ]]; then
     PACKER="/usr/local/lib/packer"
+    cd $PACKER
+    
     LOCAL=$(git rev-parse @)
     REMOTE=$(git rev-parse @{u})
     BASE=$(git merge-base @ @{u})
-    
-    cd $PACKER
     
     if [ $LOCAL = $REMOTE ]; then
         echo "Up-to-date"
