@@ -553,16 +553,17 @@ fi
 
 # Update (-Su) handling
 if [[ $option = update ]]; then
+  
+  if [[ $mirrorlist ]]; then
+    runasroot "pacman -Syy"
+    exit 1
+  fi
+  
   getignoredpackages
   sourcemakepkgconf
   # Pacman update
   if ! [[ $auronly ]]; then
     runasroot $PACMAN "${PACOPTS[@]}" "$pacmanarg"
-  fi
-  
-  if [[ $mirrorlist ]]; then
-    runasroot "pacman -Syy"
-    exit 1
   fi
 
   # Aur update
