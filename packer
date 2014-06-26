@@ -522,7 +522,7 @@ while [[ $1 ]]; do
     'search') option=search ;;
     'info') option=info ;;
     'update') option=update ; pacmanarg="-Su" ;;
-    'remove' || 'uninstall') option=remove ;;
+    'remove' | 'uninstall') option=remove ;;
     'download') option=download ;;
     'help') usage ;;
     'version') option=version ;;
