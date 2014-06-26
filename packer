@@ -584,6 +584,8 @@ if [[ $option = update ]]; then
     exit 1
   fi
   
+  if ! [[ $updateself ]]; then
+  
   # Pacman update
   if ! [[ $auronly ]]; then
     echo -e "${COLOR5}:: ${COLOR1}Synchronizing ${COLOR2}arch${ENDCOLOR} ${COLOR1}database(s)...${ENDCOLOR}"
@@ -665,6 +667,8 @@ if [[ $option = update ]]; then
     installhandling "${newpackages[@]}"
   fi
   echo " local database is up to date"
+  
+fi ##
   
   # Update packer
   if [[ $updateself ]]; then
