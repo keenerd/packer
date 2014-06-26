@@ -672,7 +672,7 @@ fi ##
   
   # Update packer
   if [[ $updateself ]]; then
-    PACKER="/usr/local/packer"
+    PACKER="/usr/local/lib/packer"
     LOCAL=$(git rev-parse @)
     REMOTE=$(git rev-parse @{u})
     BASE=$(git merge-base @ @{u})
