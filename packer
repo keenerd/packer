@@ -536,6 +536,7 @@ while [[ $1 ]]; do
     '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
     '--preview') preview='1' ;;
     '--mirror-list') mirrorlist='1' ; pacmanarg="-Syy" ;;
+    '--self') updateself='1' ;;
     '--') shift ; packageargs+=("$@") ; break ;;
     -*) echo "packer: Option \`$1' is not valid." ; exit 5 ;;
     *) packageargs+=("$1") ;;
@@ -664,6 +665,23 @@ if [[ $option = update ]]; then
     installhandling "${newpackages[@]}"
   fi
   echo " local database is up to date"
+  
+  # Update packer
+  if [[ $updateself ]]; then
+    PACKER="/usr/local/packer"
+    LOCAL=$(git rev-parse @)
+    REMOTE=$(git rev-parse @{u})
+    BASE=$(git merge-base @ @{u})
+    
+    cd $PACKER
+    
+    if [ $LOCAL = $REMOTE ]; then
+        echo "Up-to-date"
+    elif [ $LOCAL = $BASE ]; then
+        git pull
+    fi
+  fi
+  
 fi
 
 # Download (-G) handling
