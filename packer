@@ -566,10 +566,14 @@ if [[ $option = update ]]; then
   sourcemakepkgconf
   
   if [[ $mirrorlist ]]; then
-    echo -e "${COLOR5}:: ${COLOR1}Synchronizing arch database(s)...${ENDCOLOR}"
+    echo -e "${COLOR5}:: ${COLOR1}Synchronizing ${COLOR2}arch${ENDCOLOR} ${COLOR1}database(s)...${ENDCOLOR}"
+    echo
     runasroot $PACMAN "${PACOPTS[@]}" "$pacmanarg"
     
-    echo -e "${COLOR5}:: ${COLOR1}Synchronizing aur database...${ENDCOLOR}"
+    echo
+    
+    echo -e "${COLOR5}:: ${COLOR1}Synchronizing ${COLOR2}aur${ENDCOLOR} database...${ENDCOLOR}"
+    echo
     IFS=$'\n' read -rd '' -a packages < <(pacman -Qm)
     newpackages=()
     checkignores=()
@@ -581,11 +585,15 @@ if [[ $option = update ]]; then
   
   # Pacman update
   if ! [[ $auronly ]]; then
+    echo -e "${COLOR5}:: ${COLOR1}Synchronizing ${COLOR2}arch${ENDCOLOR} ${COLOR1}database(s)...${ENDCOLOR}"
+    echo
     runasroot $PACMAN "${PACOPTS[@]}" "$pacmanarg"
+    
   fi
 
   # Aur update
-  echo -e "${COLOR5}:: ${COLOR1}Synchronizing aur database...${ENDCOLOR}"
+  echo -e "${COLOR5}:: ${COLOR1}Synchronizing ${COLOR2}aur${ENDCOLOR} database...${ENDCOLOR}"
+  echo
   IFS=$'\n' read -rd '' -a packages < <(pacman -Qm)
   newpackages=()
   checkignores=()
