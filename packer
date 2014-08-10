@@ -334,10 +334,14 @@ aurinstall() {
   fi
 
   [[ $? -ne 0 ]] && echo "The build failed." && return 1
+  pkgtarfiles=""
+  for i in "${pkgname[@]}"; do
+    pkgtarfiles="$pkgtarfiles $i-$pkgver-$pkgrel*$PKGEXT"
+  done
   if  [[ $2 = dependency ]]; then
-    runasroot $PACMAN ${PACOPTS[@]} --asdeps -U $pkgname-*$PKGEXT
+    runasroot $PACMAN ${PACOPTS[@]} --asdeps -U $pkgtarfiles
   elif [[ $2 = explicit ]]; then
-    runasroot $PACMAN ${PACOPTS[@]} -U $pkgname-*$PKGEXT
+    runasroot $PACMAN ${PACOPTS[@]} -U $pkgtarfiles
   fi
 }
 
