@@ -328,11 +328,7 @@ aurinstall() {
 
   # Installation (makepkg and pacman)
   rm -f *$PKGEXT
-  if [[ $UID -eq 0 ]]; then
-    makepkg $MAKEPKGOPTS --asroot -f
-  else
-    makepkg $MAKEPKGOPTS -f
-  fi
+  makepkg $MAKEPKGOPTS -f
 
   [[ $? -ne 0 ]] && echo "The build failed." && return 1
   pkgtarfiles=""
