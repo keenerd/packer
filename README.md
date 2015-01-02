@@ -4,6 +4,7 @@ apacman
 ArchLinux User Repository (AUR) helper and pacman wrapper forked from packer
 
 Features:
+* **new** run as root workaround for Pacman 4.2+
 * All features from packer
 * Saves built AUR packages to /var/cache/apacman/pkg
 * **new** Uses AUR package cache directory if applicable

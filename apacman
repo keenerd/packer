@@ -1,10 +1,11 @@
 #!/bin/bash
 ######################################################################
 # apacman - AUR wrapper forked from packer
-version="0.6"
+version="0.7"
 # Copyright OS Hazard <oshazard+aur@gmail.com>
 #
 # New Features:
+# * Workaround for running as root
 # * Saves AUR packages to /var/cache/apacman/pkg
 # * Uses AUR package cache directory if applicable
 # * --needed      does not install up-to-date packages
@@ -67,6 +68,16 @@ err() {
   exit 1
 }
 
+version() {
+  pacver=$(pacman -V 2>/dev/null | grep -o "Pacman v.*")
+  echo "   ===   =   =  =====     apacman v${version}  - forked from packer"
+  echo "  =   =  =   =  =   =     ${pacver}"
+  echo '  =====  =   =  ===='
+  echo '  =   =  =   =  =   =     This program may be freely redistributed under'
+  echo '  =   =   ===   =   =     the terms of the GNU General Public License.'
+  exit
+}
+
 usage() {
   echo 'usage: apacman [option] [package] [package] [...]'
   echo
@@ -90,6 +101,7 @@ usage() {
   echo '    --devel      - update devel packages during -Su'
   echo '    --skipinteg  - when using makepkg, do not check md5s'
   echo '    --preview    - edit pkgbuild before sourcing'
+  echo '    -V           - display version'
   echo '    -h           - outputs this message'
   exit
 }
@@ -136,7 +148,9 @@ existsinpacman() {
 
 # Tests whether $1 is provided in pacman, sets globally accessibly providepkg var
 providedinpacman() {
+  unset providepkg
   IFS=$'\n' read -rd '' -a providepkg < <(pacman -Ssq -- "^$1$")
+  [[ -n $providepkg ]]
 }
 
 # Tests whether $1 exists in a pacman group
@@ -264,9 +278,9 @@ pkginfo() {
     curl -Lfs "${pkgpath%/*}/PKGBUILD" > "$tmpdir/$1.PKGBUILD"
     if [[ $2 ]]; then
       # rename for syntax highlighting
-      ln -sf "$tmpdir/$1.PKGBUILD" "$tmpdir/PKGBUILD"
+      cp "$tmpdir/$1.PKGBUILD" "$tmpdir/PKGBUILD"
       confirm_edit "${COLOR6}Edit $1 PKGBUILD with \$EDITOR? [Y/n]${ENDCOLOR} " "$tmpdir/PKGBUILD"
-      rm -f "$tmpdir/PKGBUILD"
+      mv "$tmpdir/PKGBUILD" "$tmpdir/$1.PKGBUILD"
     fi
   fi
 }
@@ -376,6 +390,13 @@ aurinstall() {
     fi
   fi
 
+  # check for missing arch
+  if [[ ! " ${arch[@]} " =~ " any " ]]; then
+    if [[ ! " ${arch[@]} " =~ " ${CARCH} " ]]; then
+      echo -e "${COLOR6}warning:$ENDCOLOR $CARCH missing from arch array"
+    fi
+  fi
+
   # Allow user to edit PKGBUILD
   confirm_edit "${COLOR6}Edit $1 PKGBUILD with \$EDITOR? [Y/n]${ENDCOLOR} " PKGBUILD
   if ! [[ -f PKGBUILD ]]; then
@@ -388,14 +409,22 @@ aurinstall() {
   confirm_edit "${COLOR6}Edit $install with \$EDITOR? [Y/n]${ENDCOLOR} " "$install"
 
   # Installation (makepkg and pacman)
+  rm -f *$PKGEXT
   if [[ $UID -eq 0 ]]; then
-    makepkg $MAKEPKGOPTS --asroot -f
+    id aurbuild >/dev/null 2>/dev/null || useradd -r -d /var/empty aurbuild
+    chown -R aurbuild:aurbuild .
+    su -c "makepkg $MAKEPKGOPTS -f" aurbuild
   else
     makepkg $MAKEPKGOPTS -f
   fi
 
   [[ $? -ne 0 ]] && echo "The build failed." && return 1
+  pkgtarfiles=""
+  for i in "${pkgname[@]}"; do
+    pkgtarfiles="$pkgtarfiles $i-*$PKGEXT"
+  done
 
+  # Save packages
   if [ ! -d $saveDir ]; then
     runasroot mkdir -p $saveDir
   fi
@@ -403,9 +432,9 @@ aurinstall() {
   echo -e "${COLOR5}  -> ${COLOR1}Saved package:$ENDCOLOR $(ls $pkgname-*$PKGEXT)";
 
   if  [[ $2 = dependency ]]; then
-    runasroot $PACMAN ${PACOPTS[@]} --asdeps -U $pkgname-*$PKGEXT
+    runasroot $PACMAN ${PACOPTS[@]} --asdeps -U $pkgtarfiles
   elif [[ $2 = explicit ]]; then
-    runasroot $PACMAN ${PACOPTS[@]} -U $pkgname-*$PKGEXT
+    runasroot $PACMAN ${PACOPTS[@]} -U $pkgtarfiles
   fi
 }
 
@@ -437,8 +466,10 @@ installhandling() {
   for package in "${aurpackages[@]}"; do
     if isignored "$package"; then
       echo -ne "${COLOR5}:: ${COLOR1}$package is in IgnorePkg/IgnoreGroup. Install anyway?${ENDCOLOR} [Y/n] "
-      if [[ -z "$noconfirm" && $(! proceed) ]]; then
-        continue
+      if ! [[ $noconfirm ]]; then
+        proceed || continue
+      else
+        echo
       fi
     fi
     aurtargets+=("$package")
@@ -448,10 +479,14 @@ installhandling() {
   for package in "${aurdepends[@]}"; do
     if isignored "$package"; then
       echo -ne "${COLOR5}:: ${COLOR1}$package is in IgnorePkg/IgnoreGroup. Install anyway?${ENDCOLOR} [Y/n] "
-      if [[ -z "$noconfirm" && $(! proceed) ]]; then
+      if ! [[ $noconfirm ]]; then
+        if ! proceed; then
           echo "Unresolved dependency \`$package'"
           unset aurtargets
           break
+        fi
+      else
+        echo
       fi
     fi
   done
@@ -463,6 +498,7 @@ installhandling() {
   if [[ -z $aurtargets ]]; then
     exit
   fi
+
   # Test if aurpackages are already installed; echo warning if so
   for pkg in "${aurtargets[@]}"; do
     if existsinlocal "$pkg"; then
@@ -600,10 +636,8 @@ while [[ $1 ]]; do
     '-Si') option=info ;;
     -S*u*) option=update ; pacmanarg="$1" ;;
     '-G') option=download ;;
-    -R*) pacwrap "$@" ;;
-    -Q*) pacwrap "$@" ;;
-    -U*) pacwrap "$@" ;;
     '-h'|'--help') usage ;;
+    '-V'|'--version') version ;;
     '--quiet') quiet='1' ;;
     '--ignore') ignorearg="$2" ; PACOPTS+=("--ignore" "$2") ; shift ;;
     '--noconfirm') noconfirm='1' PACOPTS+=("--noconfirm");;
@@ -618,7 +652,7 @@ while [[ $1 ]]; do
     '--ignorearch') MAKEPKGOPTS+=("--ignorearch");;
     '--preview') preview='1' ;;
     '--') shift ; packageargs+=("$@") ; break ;;
-    -*) echo "apacman: Option \`$1' is not valid." ; exit 5 ;;
+    -*) pacwrap "$@" ;;
     *) packageargs+=("$1") ;;
   esac
   shift
@@ -711,7 +745,7 @@ if [[ $option = update ]]; then
   # Check and output ignored package update info
   for package in "${checkignores[@]}"; do
     if aurversionisnewer "${package%% *}" "${package##* }"; then
-      echo -e "${COLOR6}warning:${ENDCOLOR} $package: ignoring package upgrade (${package##* } => $aurversion)"
+      echo -e "${COLOR6}warning:${ENDCOLOR} ${package%% *}: ignoring package upgrade (${package##* } => $aurversion)"
     fi
   done
 
