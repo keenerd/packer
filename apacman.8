@@ -51,12 +51,12 @@ Show information for a package\&.
 .PP
 \fB\-G\fR
 .RS 4
-Download and extract AUR package tarballs, but don\(cqt install anything\&.
+Download and extract ABS and AUR package tarballs, but don\(cqt install anything\&.
 .RE
 .PP
 \fB\-h\fR
 .RS 4
-Show packer usage\&.
+Show apacman usage\&.
 .RE
 .SH "OPTIONS"
 .PP
@@ -105,6 +105,11 @@ Check for updates and exit\&.
 Only perform commands for the AUR\&.
 .RE
 .PP
+\fB\-\-noaur\fR
+.RS 4
+Do not perform commands for the AUR\&.
+.RE
+.PP
 \fB\-\-devel\fR
 .RS 4
 Update development packages\&. (cvs, git\&...)
@@ -117,7 +122,12 @@ Skip the integrity check by ignoring AUR package MD5 sums\&.
 .PP
 \fB\-\-preview\fR
 .RS 4
-Always offer to edit the pkgbuild before sourcing it.  To always force preview, 'alias packer="packer --preview"'
+Always offer to edit the pkgbuild before sourcing it\&.
+.RE
+.PP
+\fB\-\-warn\fR
+.RS 4
+Treat errors as non-fatal warnings (only enable if you are know what you are doing\&.)
 .RE
 .SH "INTERACTIVE MODE"
 .sp

@@ -1,13 +1,16 @@
 #!/bin/bash
 ######################################################################
 # apacman - AUR wrapper forked from packer
-version="0.7"
+version="0.8"
 # Copyright OS Hazard <oshazard+aur@gmail.com>
 #
 # New Features:
+# * Built-in ABS support
 # * Workaround for running as root
 # * Saves AUR packages to /var/cache/apacman/pkg
 # * Uses AUR package cache directory if applicable
+# * --noaur       do not actions for aur
+# * --warn        treat errors as non-fatal warnings
 # * --needed      does not install up-to-date packages
 # * --ignorearch  ignores architectures specified in PKGBUILD
 # * --skipcache   skips check for pre-built package in cache directory
@@ -43,6 +46,7 @@ saveDir='/var/cache/apacman/pkg'
 
 RPCURL="https://aur.archlinux.org/rpc.php?type"
 PKGURL="https://aur.archlinux.org"
+ABSURL="rsync.archlinux.org"
 
 if [[ -t 1 && ! $COLOR = "NO" ]]; then
   COLOR1='\e[1;39m'
@@ -65,11 +69,15 @@ ctrlc() {
 
 err() {
   echo -e "$1"
-  exit 1
+  [[ "$warn" == 1 ]] || exit 1
+}
+
+deptest() {
+  type -p $1 &>/dev/null
 }
 
 version() {
-  pacver=$(pacman -V 2>/dev/null | grep -o "Pacman v.*")
+  pacver=$($PACMAN -V 2>/dev/null | grep -o "Pacman v.*")
   echo "   ===   =   =  =====     apacman v${version}  - forked from packer"
   echo "  =   =  =   =  =   =     ${pacver}"
   echo '  =====  =   =  ===='
@@ -98,9 +106,11 @@ usage() {
   echo '    --noedit     - do not prompt to edit files'
   echo '    --quickcheck - check for updates and exit'
   echo '    --auronly    - only do actions for aur'
+  echo '    --noaur      - do not actions for aur'
   echo '    --devel      - update devel packages during -Su'
   echo '    --skipinteg  - when using makepkg, do not check md5s'
   echo '    --preview    - edit pkgbuild before sourcing'
+  echo '    --warn       - treat errors as non-fatal warnings'
   echo '    -V           - display version'
   echo '    -h           - outputs this message'
   exit
@@ -271,6 +281,17 @@ pkglink() {
   echo "${PKGURL}$(jshon -Q -e results -e URLPath -u < "$tmpdir/$1.info")"
 }
 
+absrepo() {
+  pacman -Si -- "$1" 2>/dev/null | grep ^Repository | awk '{print $NF}' | awk NR==1
+}
+
+# downloads source files ($1 is package repository, $2 is package name)
+abslink() {
+  deptest rsync || err "${COLOR7}error:${ENDCOLOR} $option requires \`rsync'"
+  rflags="-mrt --info=progress2 --no-motd --delete-after --no-p --no-o --no-g"
+  rsync $rflags --include=/$1{,/$2} --exclude=/{$1/,}* ${ABSURL}::abs/{${makearch},any}/ .
+}
+
 # downloads pkgbuild ($1), edits if $2 is set
 pkginfo() {
   if ! [[ -f "$tmpdir/$1.PKGBUILD" ]]; then
@@ -334,7 +355,6 @@ checkcache() {
 
   if [ "$skipcache" != "1" ]; then
     sourcemakepkgconf
-    makearch=$(grep ^CARCH= "/etc/makepkg.conf" 2>/dev/null | grep -o -e =.*[0-9A-Za-z] | sed 's/^="//');    
     pkgfile=$(ls ${saveDir}/${1}-${pkgver}-${pkgrel}-{any,${makearch}}.pkg.{tar,tar.xz} 2>/dev/null | awk NR==1);    
   fi
 
@@ -450,7 +470,7 @@ installhandling() {
       pacmanpackages+=("$package")
     elif ! [[ $auronly ]] && existsinpacmangroup "$package"; then
       pacmanpackages+=("$package")
-    elif existsinaur "$package"; then
+    elif ! [[ $noaur ]] && existsinaur "$package"; then
       if finddeps "$package"; then
         # here is where dep dupes are created
         aurpackages+=("$package")
@@ -643,7 +663,8 @@ while [[ $1 ]]; do
     '--noconfirm') noconfirm='1' PACOPTS+=("--noconfirm");;
     '--needed') needed='1' PACOPTS+=("--needed");;
     '--noedit') noedit='1' ;;
-    '--auronly') auronly='1' ;;
+    '--auronly') auronly='1' ; unset noaur ;;
+    '--noaur') noaur='1' ; unset auronly ;;
     '--quickcheck') quickcheck='1' ;;
     '--devel') devel='1' ;;
     '--skipcache') skipcache='1' ;;
@@ -651,6 +672,7 @@ while [[ $1 ]]; do
     '--skipinteg') MAKEPKGOPTS+=("--skipinteg");;
     '--ignorearch') MAKEPKGOPTS+=("--ignorearch");;
     '--preview') preview='1' ;;
+    '--warn') warn='1' ;;
     '--') shift ; packageargs+=("$@") ; break ;;
     -*) pacwrap "$@" ;;
     *) packageargs+=("$1") ;;
@@ -658,7 +680,10 @@ while [[ $1 ]]; do
   shift
 done
 
-# check for new packages
+# Determine architecture
+makearch=$(grep ^CARCH= "$makepkgconf" 2>/dev/null | grep -o -e =.*[0-9A-Za-z] | sed 's/^="//');
+
+# Check for new packages
 if [[ $quickcheck == 1 ]]; then
   run_quick_check
   exit
@@ -667,6 +692,7 @@ fi
 # Sanity checks
 [[ $option ]] || option="searchinstall"
 [[ $option != "update" && -z $packageargs ]] && err "Must specify a package."
+[[ $auronly && $noaur ]] && err "Parameters --auronly and --noaur conflict."
 
 # Install (-S) handling
 if [[ $option = install ]]; then
@@ -684,12 +710,15 @@ if [[ $option = update ]]; then
   fi
 
   # Aur update
-  echo -e "${COLOR5}:: ${COLOR1}Synchronizing aur database...${ENDCOLOR}"
-  IFS=$'\n' read -rd '' -a packages < <(pacman -Qm)
-  newpackages=()
-  checkignores=()
-  total="${#packages[@]}"
-  grep -q '^ *ILoveCandy' "$pacmanconf" && bartype='candy' || bartype='normal'
+  total=0
+  if ! [[ $noaur ]]; then
+    echo -e "${COLOR5}:: ${COLOR1}Synchronizing aur database...${ENDCOLOR}"
+    IFS=$'\n' read -rd '' -a packages < <(pacman -Qm)
+    newpackages=()
+    checkignores=()
+    total="${#packages[@]}"
+    grep -q '^ *ILoveCandy' "$pacmanconf" && bartype='candy' || bartype='normal'
+  fi
 
   if [[ $devel ]]; then
     for ((i=0; i<$total; i++)); do 
@@ -740,7 +769,7 @@ if [[ $option = update ]]; then
   fi
   echo
 
-  echo -e "${COLOR5}:: ${COLOR1}Starting full aur upgrade...${ENDCOLOR}"
+  [[ $noaur ]] || echo -e "${COLOR5}:: ${COLOR1}Starting full aur upgrade...${ENDCOLOR}"
 
   # Check and output ignored package update info
   for package in "${checkignores[@]}"; do
@@ -754,23 +783,41 @@ if [[ $option = update ]]; then
     auronly='1'
     installhandling "${newpackages[@]}"
   fi
-  echo " local database is up to date"
+  [[ $noaur ]] || echo " local database is up to date"
 fi
 
 # Download (-G) handling
 if [[ $option = download ]]; then
   for package in "${packageargs[@]}"; do
-    if existsinaur "$package"; then
+    if ! [[ $noaur ]] && existsinaur "$package"; then
       pkglist+=("$package")
+    elif ! [[ $auronly ]] && existsinpacman "$package"; then
+      abslist+=("$package")
+    elif [[ $noaur ]]; then
+      err "Package \`$package' does not exist in ABS."
+    elif [[ $auronly ]]; then
+      err "Package \`$package' does not exist in AUR."
     else
-      err "Package \`$package' does not exist on aur."
+      err "Package \`$package' does not exist in ABS+AUR."
     fi
   done
 
+  [[ $abslist ]] && echo -e "${COLOR6}notice:$ENDCOLOR sourcing from ${COLOR4}[ABS]$ENDCOLOR"
+  for package in "${abslist[@]}"; do
+    pkgrepo=$(absrepo "$package")
+    abslink "$pkgrepo" "$package"
+    [ -d "$package" ] && rm -r "$package"
+    mv "$pkgrepo/$package" "$package"
+    rmdir "$pkgrepo"
+    ls "$package" | awk -v package="$package" '{print package"/"$0}'
+  done
+
+  [[ $pkglist ]] && echo -e "${COLOR6}notice:$ENDCOLOR sourcing from ${COLOR3}[AUR]$ENDCOLOR"
   for package in "${pkglist[@]}"; do
     curl -Lfs "$(pkglink $package)" > "$package.tar.gz"
+    [ -d "$package" ] && rm -r "$package"
     mkdir "$package"
-    tar xf "$package.tar.gz" -C "$package" --strip-components=1
+    tar xvf "$package.tar.gz" -C "$package" --strip-components=1
   done
 fi
 
@@ -797,23 +844,28 @@ if [[ $option = search || $option = searchinstall ]]; then
   fi
 
   # Aur searching and tmpfile preparation
-  for package in "${packageargs[@]}"; do
-    curl -LfGs --data-urlencode "arg=$package" "$RPCURL=search" | \
-    jshon -Q -e results -a -e Name -u -p -e Version -u -p -e NumVotes -u -p -e Description -u | \
-    sed 's/^$/-/' |  paste -s -d "\t\t\t\n" | sort -nr -k 3 > "$tmpdir/$package.search" &
-  done
-  wait
-  cp "$tmpdir/${packageargs[0]}.search" "$tmpdir/search.results"
-  for ((i=1 ; i<${#packageargs[@]} ; i++)); do
-    grep -xFf "$tmpdir/search.results" "$tmpdir/${packageargs[$i]}.search" > "$tmpdir/search.results-2"
-    mv "$tmpdir/search.results-2" "$tmpdir/search.results"
-  done
-  sed -i '/^$/d' "$tmpdir/search.results"
+  if ! [[ $noaur ]]; then
+    for package in "${packageargs[@]}"; do
+      curl -LfGs --data-urlencode "arg=$package" "$RPCURL=search" | \
+      jshon -Q -e results -a -e Name -u -p -e Version -u -p -e NumVotes -u -p -e Description -u | \
+      sed 's/^$/-/' |  paste -s -d "\t\t\t\n" | sort -nr -k 3 > "$tmpdir/$package.search" &
+    done
+    wait
+    cp "$tmpdir/${packageargs[0]}.search" "$tmpdir/search.results"
+    for ((i=1 ; i<${#packageargs[@]} ; i++)); do
+      grep -xFf "$tmpdir/search.results" "$tmpdir/${packageargs[$i]}.search" > "$tmpdir/search.results-2"
+      mv "$tmpdir/search.results-2" "$tmpdir/search.results"
+    done
+    sed -i '/^$/d' "$tmpdir/search.results"
 
-  # Prepare tmp file and arrays
-  IFS=$'\n' read -rd '' -a aurname < <(cut -f 1 "$tmpdir/search.results")
-  aurtotal="${#aurname[@]}"
-  alltotal="$(($pactotal+$aurtotal))"
+    # Prepare tmp file and arrays
+    IFS=$'\n' read -rd '' -a aurname < <(cut -f 1 "$tmpdir/search.results")
+    aurtotal="${#aurname[@]}"
+    alltotal="$(($pactotal+$aurtotal))"
+  else
+    alltotal="$pactotal"
+  fi
+
   # Echo out the -Ss formatted package information
 
   IFS=$'\t\n'
@@ -882,7 +934,7 @@ if [[ $option = info ]]; then
       results="$(sed -r "s|^[^ ][^:]*:|$S${COLOR1}&$S${ENDCOLOR}|" <<< "$results")"
       echo -e "$results"
       exit
-    else # Check to see if it is in the aur
+    elif ! [[ $noaur ]]; then # Check to see if it is in the aur
       pkginfo "$package" "$preview"
       [[ -s "$tmpdir/$package.PKGBUILD" ]] || err "${COLOR7}error:${ENDCOLOR} package '$package' was not found"
       . "$tmpdir/$package.PKGBUILD"
@@ -918,6 +970,8 @@ if [[ $option = info ]]; then
       echo -e "${COLOR1}Architecture   : ${ENDCOLOR}${arch[@]}"
       echo -e "${COLOR1}Description    : ${ENDCOLOR}$pkgdesc"
       echo
+    else
+      err "${COLOR7}error:${ENDCOLOR} package '$package' was not found"
     fi
   done
 fi
