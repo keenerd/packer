@@ -1,0 +1,242 @@
+'\" t
+.\"     Title: apacman.conf
+.\"    Author: [see the "Authors" section]
+.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
+.\"      Date: 01/10/2015
+.\"    Manual: apacman Manual
+.\"    Source: apacman
+.\"  Language: English
+.\"
+.TH "APACMAN\&.CONF" "5" "01/10/2015" "apacman" "apacman Manual"
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+apacman.conf \- apacman AUR wrapper optional configuration file
+.SH "SYNOPSIS"
+.sp
+/etc/apacman\&.conf
+.SH "DESCRIPTION"
+.sp
+apacman will attempt to read apacman\&.conf each time it is run\&.
+
+.SH "EXAMPLE"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+#
+# /etc/apacman\&.conf
+#
+noedit=1
+skipcache=1
+savedir="/var/cache/apacman/pkg"
+
+.fi
+.if n \{\
+.RE
+.\}
+.if n \{\
+.sp
+.\}
+.RS 4
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBNote\fR
+.ps -1
+.br
+.sp
+Flags must be set equal to 1\&. No spaces are allowed\&.
+Each option must be lowercase (except for URLs and colors which must be UPPERCASE)\&.
+.sp .5v
+
+.SH "OPTIONS"
+.PP
+\fBauronly =\fR 1
+.RS 4
+Only do actions for AUR\&.
+.RE
+.PP
+\fBcachevcs =\fR 1
+.RS 4
+Installs cached VCS packages if newer than AUR PKGBUILD versions\&.
+.RE
+.PP
+\fBignorearch =\fR 1
+.RS 4
+Ignore missing architecture in PKGBUILD (mostly for ARM systems)\&.
+.RE
+.PP
+\fBneeded =\fR 1
+.RS 4
+Do not install up-to-date packages\&.
+.RE
+.PP
+\fBnoconfirm =\fR 1
+.RS 4
+Do not prompt for any confirmation\&.
+.RE
+.PP
+\fBnoedit =\fR 1
+.RS 4
+Do not prompt to edit files with EDITOR\&.
+.RE
+.PP
+\fBnoaur =\fR 1
+.RS 4
+Do no actions for AUR (hint: useful with --warn)\&.
+.RE
+.PP
+\fBpreview =\fR 1
+.RS 4
+Prompt to edit PKGBUILD and .install before building\&.
+.RE
+.PP
+\fBquiet =\fR 1
+.RS 4
+Do not show packages descriptions in search\&.
+.RE
+.PP
+\fBskipcache =\fR 1
+.RS 4
+Do not install from pre-built packages in cache directory\&.
+.RE
+.PP
+\fBskipinteg =\fR 1
+.RS 4
+Ignore missing or invalid source file hashes\&.
+.RE
+.PP
+\fBwarn =\fR 1
+.RS 4
+Do not exit on errors, treat as non-fatal warnings\&.
+.RE
+
+.SH "CONFIGURATION"
+.PP
+\fBtmpdir =\fR path/to/temp/dir
+.RS 4
+Overrides the default temporary directory for apacman to build packages in\&. A tmpfs (RAM disk) directory is recommended\&. Directory must be "owned" by user\&.
+.sp .5v
+\fBDefault\fR: /tmp/apacmantmp-$UID
+.sp .5v
+\fBNOTE\fR: \fIroot\fR builds packages as \fIaurbuild\fR user\&.
+.RE
+.PP
+\fBmakepkgconf =\fR path/to/makepkg.conf
+.RS 4
+Overrides the default location of the global makepkg configuration file\&.
+.sp .5v
+\fBDefault\fR: /etc/makepkg.conf
+.RE
+.PP
+\fBusermakepkgconf =\fR path/to/.makepkg.conf
+.RS 4
+Overrides the global makepkg.conf with a user makepkg configuration file\&.
+.sp .5v
+\fBDefault\fR: $HOME/.makepkg.conf
+.RE
+.PP
+\fBpacmanconf =\fR path/to/pacman.conf
+.RS 4
+Overrides the default location of the global pacman configuration file\&.
+.sp .5v
+\fBDefault\fR: /etc/pacman.conf
+.RE
+.PP
+\fBsavedir =\fR path/to/cache/dir
+.RS 4
+Overrides the default location of the package cache directory\&.
+.sp .5v
+\fBDefault\fR: /var/cache/apacman/pkg
+.RE
+.PP
+\fBRPCURL =\fR url/to/AUR/Search
+.RS 4
+Overrides the URL address to the Arch User Repository's RPC-interface API\&.
+.sp .5v
+\fBDefault\fR: https://aur.archlinux.org/rpc.php?type
+.RE
+.PP
+\fBPKGURL =\fR url/to/AUR/PKGBUILDs
+.RS 4
+Overrides the URL address prefix to the Arch User Repository's PKBUILDs\&.
+.sp .5v
+\fBDefault\fR: https://aur.archlinux.org
+.RE
+
+.SH "COLORS"
+.sp
+Use apacman with colorization if your terminal supports it\&.
+.PP
+\fBCOLOR1 =\fR [\fIescape\fR] [\fIformat\fR] [\fIcolor\fR]
+.RS 4
+Overrides the bold color\&.
+.sp .5v
+\fBDefault\fR: '\\e[1;39m' (\fBdefault\fR)
+.RE
+.PP
+\fBCOLOR2 =\fR [\fIescape\fR] [\fIformat\fR] [\fIcolor\fR]
+.RS 4
+Overrides the version color\&.
+.sp .5v
+\fBDefault\fR: '\\e[1;32m' (\fBgreen\fR)
+.RE
+.PP
+\fBCOLOR3 =\fR [\fIescape\fR] [\fIformat\fR] [\fIcolor\fR]
+.RS 4
+Overrides the repository color\&.
+.sp .5v
+\fBDefault\fR: '\\e[1;35m' (\fBpurple\fR)
+.RE
+.PP
+\fBCOLOR4 =\fR [\fIescape\fR] [\fIformat\fR] [\fIcolor\fR]
+.RS 4
+Overrides the URL color\&.
+.sp .5v
+\fBDefault\fR: '\\e[1;36m' (\fBturqoise\fR)
+.RE
+.PP
+\fBCOLOR5 =\fR [\fIescape\fR] [\fIformat\fR] [\fIcolor\fR]
+.RS 4
+Overrides the attention color\&.
+.sp .5v
+\fBDefault\fR: '\\e[1;34m' (\fBblue\fR)
+.RE
+.PP
+\fBCOLOR6 =\fR [\fIescape\fR] [\fIformat\fR] [\fIcolor\fR]
+.RS 4
+Overrides the warning color\&.
+.sp .5v
+\fBDefault\fR: '\\e[1;33m' (\fByellow\fR)
+.RE
+.PP
+\fBCOLOR7 =\fR [\fIescape\fR] [\fIformat\fR] [\fIcolor\fR]
+.RS 4
+Overrides the error color\&.
+.sp .5v
+\fBDefault\fR: '\\e[1;31m' (\fBred\fR)
+.RE
+
+.SH "SEE ALSO"
+.sp
+\fBapacman\fR(8)
+.sp
+\fBpacman.conf\fR(5)
+.sp
+\fBmakepkg.conf\fR(5)
+
+.SH "AUTHORS"
+.sp
+OS Hazard <oshazard+apacman@gmail\&.com>

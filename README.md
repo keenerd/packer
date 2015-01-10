@@ -4,6 +4,8 @@ apacman
 ArchLinux User Repository (AUR) helper and pacman wrapper forked from packer
 
 Features:
+* (**new**) Config file support (/etc/apacman.conf)
+* (**new**) Cleaned up manpages
 * (**new**) Replacement for pacsysclean (-L list installed packages by size)
 * (**new**) Built-in ABS support (-G now support ABS+AUR packages)
 * (**new**) --noaur parameter to skip AUR packages

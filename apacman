@@ -1,14 +1,17 @@
 #!/bin/bash
 ######################################################################
 # apacman - AUR wrapper forked from packer
-version="0.9"
+version="1.0"
 # Copyright OS Hazard <oshazard+aur@gmail.com>
 #
 # New Features:
+# * Config file support
 # * Built-in ABS support
 # * Workaround for running as root
 # * Saves AUR packages to /var/cache/apacman/pkg
 # * Uses AUR package cache directory if applicable
+# * --config      specify alternate config file (default: /etc/apacman.conf)
+# * --verbose     turns on verbose output
 # * -L            list installed packages by size
 # * --noaur       do not actions for aur
 # * --warn        treat errors as non-fatal warnings
@@ -35,19 +38,20 @@ version="0.9"
 
 [[ $PACMAN ]] || PACMAN="pacman"
 
-# set tmpfile stuff, clean tmpdir
-tmpdir="${TMPDIR:-/tmp}/apacmantmp-$UID"
-rm -rf "$tmpdir" &>/dev/null
-mkdir -p "$tmpdir"
-
 makepkgconf='/etc/makepkg.conf'
 usermakepkgconf="$HOME/.makepkg.conf"
 pacmanconf='/etc/pacman.conf'
-saveDir='/var/cache/apacman/pkg'
+apacmanconf='/etc/apacman.conf'
+savedir='/var/cache/apacman/pkg'
 
 RPCURL="https://aur.archlinux.org/rpc.php?type"
 PKGURL="https://aur.archlinux.org"
 ABSURL="rsync.archlinux.org"
+
+# set tmpfile stuff, clean tmpdir
+tmpdir="${TMPDIR:-/tmp}/apacmantmp-$UID"
+rm -rf "$tmpdir" &>/dev/null
+mkdir -p "$tmpdir"
 
 if [[ -t 1 && ! $COLOR = "NO" ]]; then
   COLOR1='\e[1;39m'
@@ -97,25 +101,48 @@ usage() {
   echo '    -G           - download and extract aur tarball only'
   echo '    -L           - list installed packages by size'
   echo
-  echo '    --needed     - do not install up-to-date packages'
-  echo '    --ignorearch - ignore a missing or incomplete architecture field'
-  echo '    --skipcache  - skips check for pre-built package in cache directory'
-  echo '    --cachevcs   - installs cached VCS (git, svn, hg) packages newer than AUR PKGBUILDs'
-  echo
-  echo '    --quiet      - only output package name for searches'
+  echo '    --auronly    - only do actions for AUR'
+  echo '    --config     - specify alternate config file (default: /etc/apacman.conf)'
+  echo '    --cachevcs   - installs cached VCS packages newer than AUR PKGBUILDs'
+  echo '    --devel      - update VCS (git, svn, hg) packages during -Su'
   echo '    --ignore     - takes a comma-separated list of packages to ignore'
+  echo '    --ignorearch - ignore a missing or incomplete architecture field'
+  echo '    --needed     - do not install up-to-date packages'
+  echo '    --noaur      - do not actions for AUR'
   echo '    --noconfirm  - do not prompt for any confirmation'
   echo '    --noedit     - do not prompt to edit files'
-  echo '    --quickcheck - check for updates and exit'
-  echo '    --auronly    - only do actions for aur'
-  echo '    --noaur      - do not actions for aur'
-  echo '    --devel      - update devel packages during -Su'
-  echo '    --skipinteg  - when using makepkg, do not check md5s'
   echo '    --preview    - edit pkgbuild before sourcing'
+  echo '    --quickcheck - check for updates and exit'
+  echo '    --quiet      - only output package name for searches'
+  echo '    --skipcache  - skips check for pre-built package in cache directory'
+  echo '    --skipinteg  - when using makepkg, do not check md5s'
   echo '    --warn       - treat errors as non-fatal warnings'
+  echo '    -v           - turns on verbose output'
   echo '    -V           - display version'
   echo '    -h           - outputs this message'
   exit
+}
+
+varstatus() {
+  val=$(eval echo \$$1)
+  if [ "$val" == 1 ]; then
+    echo -e "${COLOR1}$1${ENDCOLOR}" | awk '{printf "%-25s %-40s\n",$1,": yes"}';
+  elif [[ -r $val ]]; then
+    echo -e "${COLOR1}$1${ENDCOLOR} $val" | awk '{printf "%-25s %-40s\n",$1,": "$2}';
+  fi
+}
+
+infoconf() {
+  vars="apacmanconf tmpdir makepkgconf usermakepkgconf pacmanconf savedir"
+  for i in $vars; do
+    varstatus $i
+  done
+
+  vars="auronly cachevcs ignorearch needed noaur noconfirm"
+  vars="$vars noedit preview quiet skipcache skipinteg warn"
+  for j in $vars; do
+    varstatus $j
+  done
 }
 
 # Called whenever anything needs to be run as root ($@ is the command)
@@ -128,6 +155,15 @@ runasroot() {
     echo -n "root "
     su -c "$(printf '%q ' "$@")"
   fi
+}
+
+# Source apacman.conf file
+sourceapacmanconf() {
+  [[ -r "$apacmanconf" ]] && . "$apacmanconf"
+  [[ noconfirm ]] && PACOPTS+=("--noconfirm")
+  [[ needed ]] && PACOPTS+=("--needed")
+  [[ skipinteg ]] && MAKEPKGOPTS+=("--skipinteg")
+  [[ ignorearch ]] && MAKEPKGOPTS+=("--ignorearch")
 }
 
 # Source makepkg.conf file
@@ -347,13 +383,13 @@ confirm_edit() {
 # Checks if aur cache is newer than aur ($1 is package, $2 is aur version)
 checkvcs() {
   if [ "$cachevcs" = "1" ]; then
-  cachefile=$(ls --sort=time ${saveDir}/${1}-*-{any,${makearch}}.pkg.{tar,tar.xz} 2>/dev/null | awk NR==1 | awk -F "${saveDir}/${1}-" '{print $2}');
+  cachefile=$(ls --sort=time ${savedir}/${1}-*-{any,${makearch}}.pkg.{tar,tar.xz} 2>/dev/null | awk NR==1 | awk -F "${savedir}/${1}-" '{print $2}');
   cachever=$(echo "$cachefile" | sed "s/-any.pkg.tar.xz//g;s/-any.pkg.tar//g;s/-${makearch}.pkg.tar.xz//g;s/-${makearch}.pkg.tar//g");
     if [[ "$(LC_ALL=C vercmp "$cachever" "$2")" -gt 0 ]]; then
       echo -e "${COLOR7}warning:${ENDCOLOR} $pkg -- ${COLOR7}verify cache newer than AUR${ENDCOLOR} ($pkgver-$pkgrel)" 
-      pkgfile="${saveDir}/${1}-${cachefile}";
+      pkgfile="${savedir}/${1}-${cachefile}";
     elif [[ "$(LC_ALL=C vercmp "$cachever" "$2")" -eq 0 ]]; then
-      pkgfile="${saveDir}/${1}-${cachefile}";
+      pkgfile="${savedir}/${1}-${cachefile}";
     fi
   fi;
 }
@@ -364,7 +400,7 @@ checkcache() {
 
   if [ "$skipcache" != "1" ]; then
     sourcemakepkgconf
-    pkgfile=$(ls ${saveDir}/${1}-${pkgver}-${pkgrel}-{any,${makearch}}.pkg.{tar,tar.xz} 2>/dev/null | awk NR==1);    
+    pkgfile=$(ls ${savedir}/${1}-${pkgver}-${pkgrel}-{any,${makearch}}.pkg.{tar,tar.xz} 2>/dev/null | awk NR==1);
   fi
 
   if [ "$cachevcs" = "1" ]; then
@@ -454,10 +490,10 @@ aurinstall() {
   done
 
   # Save packages
-  if [ ! -d $saveDir ]; then
-    runasroot mkdir -p $saveDir
+  if [ ! -d $savedir ]; then
+    runasroot mkdir -p $savedir
   fi
-  runasroot cp $pkgname-*$PKGEXT $saveDir/
+  runasroot cp $pkgname-*$PKGEXT $savedir/
   echo -e "${COLOR5}  -> ${COLOR1}Saved package:$ENDCOLOR $(ls $pkgname-*$PKGEXT)";
 
   if  [[ $2 = dependency ]]; then
@@ -666,29 +702,34 @@ while [[ $1 ]]; do
     -S*u*) option=update ; pacmanarg="$1" ;;
     '-G') option=download ;;
     -L*) option=list ; pacmanarg="${1//-L}" ;;
-    '-h'|'--help') usage ;;
-    '-V'|'--version') version ;;
-    '--quiet') quiet='1' ;;
-    '--ignore') ignorearg="$2" ; PACOPTS+=("--ignore" "$2") ; shift ;;
-    '--noconfirm') noconfirm='1' PACOPTS+=("--noconfirm");;
-    '--needed') needed='1' PACOPTS+=("--needed");;
-    '--noedit') noedit='1' ;;
     '--auronly') auronly='1' ; unset noaur ;;
-    '--noaur') noaur='1' ; unset auronly ;;
-    '--quickcheck') quickcheck='1' ;;
-    '--devel') devel='1' ;;
-    '--skipcache') skipcache='1' ;;
     '--cachevcs') cachevcs='1' ;;
-    '--skipinteg') MAKEPKGOPTS+=("--skipinteg");;
+    '--config') config='1' ; apacmanconf="$2" ; shift ;;
+    '--devel') devel='1' ;;
+    '--ignore') ignorearg="$2" ; PACOPTS+=("--ignore" "$2") ; shift ;;
     '--ignorearch') MAKEPKGOPTS+=("--ignorearch");;
+    '--needed') needed='1' PACOPTS+=("--needed");;
+    '--noaur') noaur='1' ; unset auronly ;;
+    '--noconfirm') noconfirm='1' PACOPTS+=("--noconfirm");;
+    '--noedit') noedit='1' ;;
     '--preview') preview='1' ;;
+    '--quickcheck') quickcheck='1' ;;
+    '--quiet') quiet='1' ;;
+    '--skipcache') skipcache='1' ;;
+    '--skipinteg') skipinteg='1' ; MAKEPKGOPTS+=("--skipinteg");;
     '--warn') warn='1' ;;
+    '-h'|'--help') usage ;;
+    '-v'|'--verbose') verbose='1' ;;
+    '-V'|'--version') version ;;
     '--') shift ; packageargs+=("$@") ; break ;;
     -*) pacwrap "$@" ;;
     *) packageargs+=("$1") ;;
   esac
   shift
 done
+
+# Override defaults
+sourceapacmanconf
 
 # Determine architecture
 makearch=$(grep ^CARCH= "$makepkgconf" 2>/dev/null | grep -o -e =.*[0-9A-Za-z] | sed 's/^="//');
@@ -700,8 +741,11 @@ if [[ $quickcheck == 1 ]]; then
 fi
 
 # Sanity checks
+[[ $verbose || $debug ]] && infoconf
+[[ $config && -z $apacmanconf ]] && err "${COLOR7}error:${ENDCOLOR} no config file specified (use -h for help)"
 [[ $option ]] || option="searchinstall"
-[[ $option != "list" && $option != "update" && -z $packageargs ]] && err "Must specify a package."
+[[ $option != "searchinstall" && -z $packageargs ]] && err "${COLOR7}error:${ENDCOLOR} no operation specified (use -h for help)"
+[[ $option != "list" && $option != "update" && -z $packageargs ]] && err "${COLOR7}error:${ENDCOLOR} must specify a package."
 [[ $auronly && $noaur ]] && err "Parameters --auronly and --noaur conflict."
 
 # List (-L) handling

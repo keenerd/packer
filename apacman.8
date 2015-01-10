@@ -2,12 +2,12 @@
 .\"     Title: apacman
 .\"    Author: [see the "Authors" section]
 .\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
-.\"      Date: 01/09/2015
+.\"      Date: 01/10/2015
 .\"    Manual: apacman Manual
 .\"    Source: apacman
 .\"  Language: English
 .\"
-.TH "APACMAN" "8" "01/09/2015" "apacman" "apacman Manual"
+.TH "APACMAN" "8" "01/10/2015" "apacman" "apacman Manual"
 .\" -----------------------------------------------------------------
 .\" * set default formatting
 .\" -----------------------------------------------------------------
@@ -61,23 +61,23 @@ List installed packages by size (replacement for pacsysclean\&.)
 .PP
 \fB\-h\fR
 .RS 4
+Show apacman version\&.
+.RE
+.PP
+\fB\-h\fR
+.RS 4
 Show apacman usage\&.
 .RE
 .SH "OPTIONS"
 .PP
-\fB\-\-needed\fR
+\fB\-\-auronly\fR
 .RS 4
-Does not install up-to-date packages\&.
+Only perform commands for the AUR\&.
 .RE
 .PP
-\fB\-\-ignorearch\fR
+\fB\-\-config\fR <\'file\'>
 .RS 4
-ignores architectures specified in PKGBUILD\&.
-.RE
-.PP
-\fB\-\-skipcache\fR
-.RS 4
-skips check for pre-built package in cache directory\&.
+Use alternate configuration file\&.
 .RE
 .PP
 \fB\-\-cachevcs\fR
@@ -85,9 +85,29 @@ skips check for pre-built package in cache directory\&.
 installs cached VCS (git, svn, hg) packages newer than AUR PKGBUILDs\&.
 .RE
 .PP
+\fB\-\-devel\fR
+.RS 4
+Update development packages\&. (cvs, git\&...)
+.RE
+.PP
 \fB\-\-ignore\fR <\'package\'>
 .RS 4
 Ignore packages\&. Separate package names with a comma\&.
+.RE
+.PP
+\fB\-\-ignorearch\fR
+.RS 4
+ignores architectures specified in PKGBUILD\&.
+.RE
+.PP
+\fB\-\-needed\fR
+.RS 4
+Does not install up-to-date packages\&.
+.RE
+.PP
+\fB\-\-noaur\fR
+.RS 4
+Do not perform commands for the AUR\&.
 .RE
 .PP
 \fB\-\-noconfirm\fR
@@ -100,24 +120,24 @@ Perform commands without confirmation from the user\&.
 Perform commands without asking if the user wants to edit any installation files\&.
 .RE
 .PP
+\fB\-\-preview\fR
+.RS 4
+Always offer to edit the pkgbuild before sourcing it\&.
+.RE
+.PP
 \fB\-\-quickcheck\fR
 .RS 4
 Check for updates and exit\&.
 .RE
 .PP
-\fB\-\-auronly\fR
+\fB\-\-quiet\fR
 .RS 4
-Only perform commands for the AUR\&.
+Turn off package descriptions\&.
 .RE
 .PP
-\fB\-\-noaur\fR
+\fB\-\-skipcache\fR
 .RS 4
-Do not perform commands for the AUR\&.
-.RE
-.PP
-\fB\-\-devel\fR
-.RS 4
-Update development packages\&. (cvs, git\&...)
+skips check for pre-built package in cache directory\&.
 .RE
 .PP
 \fB\-\-skipinteg\fR
@@ -125,9 +145,9 @@ Update development packages\&. (cvs, git\&...)
 Skip the integrity check by ignoring AUR package MD5 sums\&.
 .RE
 .PP
-\fB\-\-preview\fR
+\fB\-\-verbose\fR
 .RS 4
-Always offer to edit the pkgbuild before sourcing it\&.
+Show enabled options\&.
 .RE
 .PP
 \fB\-\-warn\fR
@@ -250,7 +270,20 @@ To manually edit files, packer uses the EDITOR variable\&. If EDITOR is not set 
 .sp
 Packages are built in the TMPDIR path\&. If the TMPDIR variable is not set then the default path is /tmp
 .sp
-apacman uses these settings in /etc/pacman\&.conf:
+Default configuration file:
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+/etc/apacman\&.conf
+.RE
+.sp
+These settings are used from /etc/pacman\&.conf:
 .sp
 .RS 4
 .ie n \{\
@@ -264,9 +297,12 @@ IgnorePkg
 .RE
 .SH "SEE ALSO"
 .sp
+\fBapacman.conf\fR(5)
+.sp
 \fBpacman\fR(8)
 .sp
 \fBpacker\fR(8)
+
 .SH "AUTHORS"
 .sp
 OS Hazard <oshazard+apacman@gmail\&.com>
