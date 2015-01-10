@@ -4,10 +4,11 @@ apacman
 ArchLinux User Repository (AUR) helper and pacman wrapper forked from packer
 
 Features:
-* **new** Built-in ABS support (-G now support ABS+AUR packages)
-* **new** --noaur parameter to skip AUR packages
-* **new** --warn parameter makes errors non-fatal (only enable if you know what you are doing)
-* **new** run as root workaround for Pacman 4.2+
+* (**new**) Replacement for pacsysclean (-L list installed packages by size)
+* (**new**) Built-in ABS support (-G now support ABS+AUR packages)
+* (**new**) --noaur parameter to skip AUR packages
+* (**new**) --warn parameter makes errors non-fatal (only enable if you know what you are doing)
+* (**new**) run as root workaround for Pacman 4.2+
 * All features from packer
 * Saves built AUR packages to /var/cache/apacman/pkg
 * Uses AUR package cache directory if applicable
