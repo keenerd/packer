@@ -142,8 +142,8 @@ infoconf() {
     varstatus $i
   done
 
-  vars="auronly cachevcs ignorearch needed noaur noconfirm"
-  vars="$vars noedit preview quiet skipcache skipinteg warn"
+  vars="auronly cachevcs ignorearch needed noaur noconfirm noedit preview"
+  vars="$vars purgebuild quiet skipcache skipinteg skiptest warn"
   for j in $vars; do
     varstatus $j
   done
