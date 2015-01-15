@@ -4,6 +4,8 @@ apacman
 ArchLinux User Repository (AUR) helper and pacman wrapper forked from packer
 
 Features:
+* (**new**) --purgebuild parameter to remove unneeded build depends
+* (**new**) --skiptest to avoid installing unit test packages
 * (**new**) Config file support (/etc/apacman.conf)
 * (**new**) Cleaned up manpages
 * (**new**) Replacement for pacsysclean (-L list installed packages by size)

@@ -1,7 +1,7 @@
 #!/bin/bash
 ######################################################################
 # apacman - AUR wrapper forked from packer
-version="1.1"
+version="1.2"
 # Copyright OS Hazard <oshazard+aur@gmail.com>
 #
 # New Features:
@@ -10,6 +10,8 @@ version="1.1"
 # * Workaround for running as root
 # * Saves AUR packages to /var/cache/apacman/pkg
 # * Uses AUR package cache directory if applicable
+# * --purgebuild  remove unneeded build dependencies
+# * --skiptest    skips installing check() unit test packages
 # * --config      specify alternate config file (default: /etc/apacman.conf)
 # * --verbose     turns on verbose output
 # * -L            list installed packages by size
@@ -112,10 +114,12 @@ usage() {
   echo '    --noconfirm  - do not prompt for any confirmation'
   echo '    --noedit     - do not prompt to edit files'
   echo '    --preview    - edit pkgbuild before sourcing'
+  echo '    --purgebuild - remove unneeded build dependencies'
   echo '    --quickcheck - check for updates and exit'
   echo '    --quiet      - only output package name for searches'
   echo '    --skipcache  - skips check for pre-built package in cache directory'
   echo '    --skipinteg  - when using makepkg, do not check md5s'
+  echo '    --skiptest   - when using makepkg, do not parse check() test deps'
   echo '    --warn       - treat errors as non-fatal warnings'
   echo '    -v           - turns on verbose output'
   echo '    -V           - display version'
@@ -162,6 +166,7 @@ sourceapacmanconf() {
   [[ -r "$apacmanconf" ]] && . "$apacmanconf"
   [[ $noconfirm ]] && PACOPTS+=("--noconfirm")
   [[ $needed ]] && PACOPTS+=("--needed")
+  [[ $skiptest ]] && MAKEPKGOPTS+=("--nocheck")
   [[ $skipinteg ]] && MAKEPKGOPTS+=("--skipinteg")
   [[ $ignorearch ]] && MAKEPKGOPTS+=("--ignorearch")
 }
@@ -222,8 +227,10 @@ existsinlocal() {
 scrapeaurdeps() {
   pkginfo "$1" "$preview"
   . "$tmpdir/$1.PKGBUILD"
+  [[ $skiptest = 1 ]] && unset checkdepends
   IFS=$'\n'
-  dependencies=( $(echo -e "${depends[*]}\n${makedepends[*]}" | sed -e 's/=.*//' -e 's/>.*//' -e 's/<.*//'| sort -u) )
+  dependencies=( $(echo -e "${depends[*]}\n${makedepends[*]}\n${checkdepends[*]}" | sed -e 's/=.*//' -e 's/>.*//' -e 's/<.*//'| sort -u) )
+  purgedepends=( $(echo -e "${makedepends[*]}\n${checkdepends[*]}" | sed -e 's/=.*//' -e 's/>.*//' -e 's/<.*//'| sort -u) )
   unset IFS
 }
 
@@ -234,6 +241,7 @@ finddeps() {
   pacmandeps=()
   aurdeps=()
   scrapeaurdeps "$1"
+  [[ $purgebuild = 1 ]] && purgedeps+=("${purgedepends[@]}")
   missingdeps=( $($PACMAN -T "${dependencies[@]}") )
   while [[ $missingdeps ]]; do
     checkdeps=()
@@ -635,6 +643,11 @@ installhandling() {
       echo "Dependencies for \`$package' are not met, not building..."
     fi
   done
+
+  # Remove build dependencies
+  if [[ $purgedeps ]]; then
+    runasroot $PACMAN --noconfirm -R -- "${purgedeps[@]}"
+  fi
 }
 
 run_quick_check() {
@@ -713,10 +726,12 @@ while [[ $1 ]]; do
     '--noconfirm') noconfirm='1' PACOPTS+=("--noconfirm");;
     '--noedit') noedit='1' ;;
     '--preview') preview='1' ;;
+    '--purgebuild') purgebuild='1' ;;
     '--quickcheck') quickcheck='1' ;;
     '--quiet') quiet='1' ;;
     '--skipcache') skipcache='1' ;;
     '--skipinteg') skipinteg='1' ; MAKEPKGOPTS+=("--skipinteg");;
+    '--skiptest') skiptest='1' ; MAKEPKGOPTS+=("--nocheck");;
     '--warn') warn='1' ;;
     '-h'|'--help') usage ;;
     '-v'|'--verbose') verbose='1' ;;
