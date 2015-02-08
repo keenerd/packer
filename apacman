@@ -1,15 +1,17 @@
 #!/bin/bash
 ######################################################################
 # apacman - AUR wrapper forked from packer
-version="1.2"
+version="1.3"
 # Copyright OS Hazard <oshazard+aur@gmail.com>
 #
 # New Features:
 # * Config file support
-# * Built-in ABS support
+# * Built-in ABS support (WIP)
 # * Workaround for running as root
 # * Saves AUR packages to /var/cache/apacman/pkg
 # * Uses AUR package cache directory if applicable
+# * --buildonly   create but do not install packages
+# * --nofail      do not continue if a package fails to build
 # * --purgebuild  remove unneeded build dependencies
 # * --skiptest    skips installing check() unit test packages
 # * --config      specify alternate config file (default: /etc/apacman.conf)
@@ -21,7 +23,7 @@ version="1.2"
 # * --ignorearch  ignores architectures specified in PKGBUILD
 # * --skipcache   skips check for pre-built package in cache directory
 # * --cachevcs    installs cached VCS (git, svn, hg) packages newer than AUR PKGBUILDs
-# * partial passthrough for -R, -Q, and -U parameters
+# * partial passthrough for -R, -Q, -T and -U parameters
 ######################################################################
 
 # Copyright Matthew Bruenig <matthewbruenig@gmail.com>
@@ -39,12 +41,17 @@ version="1.2"
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 [[ $PACMAN ]] || PACMAN="pacman"
+pacmanbin="/usr/bin/pacman"
 
 makepkgconf='/etc/makepkg.conf'
 usermakepkgconf="$HOME/.makepkg.conf"
 pacmanconf='/etc/pacman.conf'
 apacmanconf='/etc/apacman.conf'
+downdir='/var/cache/pacman/pkg'
 savedir='/var/cache/apacman/pkg'
+
+editor="vi"
+[[ $EDITOR ]] && editor="$EDITOR"
 
 RPCURL="https://aur.archlinux.org/rpc.php?type"
 PKGURL="https://aur.archlinux.org"
@@ -79,12 +86,16 @@ err() {
   [[ "$warn" == 1 ]] || exit 1
 }
 
+invalid() {
+  echo -e "${COLOR7}error:${ENDCOLOR} invalid option \`$1'"
+}
+
 deptest() {
   type -p $1 &>/dev/null
 }
 
 version() {
-  pacver=$($PACMAN -V 2>/dev/null | grep -o "Pacman v.*")
+  pacver=$($pacmanbin -V 2>/dev/null | grep -o "Pacman v.*")
   echo "   ===   =   =  =====     apacman v${version}  - forked from packer"
   echo "  =   =  =   =  =   =     ${pacver}"
   echo '  =====  =   =  ===='
@@ -104,6 +115,7 @@ usage() {
   echo '    -L           - list installed packages by size'
   echo
   echo '    --auronly    - only do actions for AUR'
+  echo '    --buildonly  - create but do not install packages'
   echo '    --config     - specify alternate config file (default: /etc/apacman.conf)'
   echo '    --cachevcs   - installs cached VCS packages newer than AUR PKGBUILDs'
   echo '    --devel      - update VCS (git, svn, hg) packages during -Su'
@@ -113,6 +125,7 @@ usage() {
   echo '    --noaur      - do not actions for AUR'
   echo '    --noconfirm  - do not prompt for any confirmation'
   echo '    --noedit     - do not prompt to edit files'
+  echo '    --nofail     - do not continue if a package fails to build'
   echo '    --preview    - edit pkgbuild before sourcing'
   echo '    --purgebuild - remove unneeded build dependencies'
   echo '    --quickcheck - check for updates and exit'
@@ -137,13 +150,13 @@ varstatus() {
 }
 
 infoconf() {
-  vars="apacmanconf tmpdir makepkgconf usermakepkgconf pacmanconf savedir"
+  vars="apacmanconf downdir editor makepkgconf pacmanconf savedir tmpdir usermakepkgconf"
   for i in $vars; do
     varstatus $i
   done
 
-  vars="auronly cachevcs ignorearch needed noaur noconfirm noedit preview"
-  vars="$vars purgebuild quiet skipcache skipinteg skiptest warn"
+  vars="auronly buildonly cachevcs ignorearch needed noaur noconfirm noedit"
+  vars="$vars nofail preview purgebuild quiet skipcache skipinteg skiptest warn"
   for j in $vars; do
     varstatus $j
   done
@@ -190,7 +203,7 @@ isignored() {
 
 # List installed packages
 getlistpackages() {
-  $PACMAN -Qi${pacmanarg} | grep -e "^Name " -e "^Installed Size " | \
+  $pacmanbin -Qi${pacmanarg} | grep -e "^Name " -e "^Installed Size " | \
   awk '{if ($(NF-1) ~ /^[0-9]/) printf $(NF-1); print $NF}' | paste -s -d' \n' | \
   sed -e 's/iB$//' -e 's/\.00K/K/' -e 's/\.00B/B/' | awk '{printf "%-10s %-40s\n",$2,$1}' | sort -h
 }
@@ -203,24 +216,24 @@ existsinaur() {
 
 # Tests whether $1 exists in pacman
 existsinpacman() {
-  $PACMAN -Si -- "$1" &>/dev/null
+  $pacmanbin -Si -- "$1" &>/dev/null
 }
 
 # Tests whether $1 is provided in pacman, sets globally accessibly providepkg var
 providedinpacman() {
   unset providepkg
-  IFS=$'\n' read -rd '' -a providepkg < <($PACMAN -Ssq -- "^$1$")
+  IFS=$'\n' read -rd '' -a providepkg < <($pacmanbin -Ssq -- "^$1$")
   [[ -n $providepkg ]]
 }
 
 # Tests whether $1 exists in a pacman group
 existsinpacmangroup() {
-  [[ $($PACMAN -Sgq "$1") ]]
+  [[ $($pacmanbin -Sgq "$1") ]]
 }
 
 # Tests whether $1 exists locally
 existsinlocal() {
-  $PACMAN -Qq -- "$1" &>/dev/null
+  $pacmanbin -Qq -- "$1" &>/dev/null
 }
 
 # Scrapes the aur deps from PKGBUILDS and puts in globally available dependencies array
@@ -241,8 +254,8 @@ finddeps() {
   pacmandeps=()
   aurdeps=()
   scrapeaurdeps "$1"
-  [[ $purgebuild = 1 ]] && purgedeps+=("${purgedepends[@]}")
-  missingdeps=( $($PACMAN -T "${dependencies[@]}") )
+  [[ $buildonly = 1 || $purgebuild = 1 ]] && purgedeps+=( $($pacmanbin -T "${purgedepends[@]}") )
+  missingdeps=( $($pacmanbin -T "${dependencies[@]}") )
   while [[ $missingdeps ]]; do
     checkdeps=()
     for dep in "${missingdeps[@]}"; do
@@ -270,7 +283,7 @@ finddeps() {
     for dep in "${checkdeps[@]}"; do
       scrapeaurdeps "$dep"
       for depdep in "${dependencies[@]}"; do
-        [[ $($PACMAN -T "$depdep") ]] && missingdeps+=("$depdep")
+        [[ $($pacmanbin -T "$depdep") ]] && missingdeps+=("$depdep")
       done
     done
   done
@@ -335,7 +348,7 @@ pkglink() {
 }
 
 absrepo() {
-  $PACMAN -Si -- "$1" 2>/dev/null | grep ^Repository | awk '{print $NF}' | awk NR==1
+  $pacmanbin -Si -- "$1" 2>/dev/null | grep ^Repository | awk '{print $NF}' | awk NR==1
 }
 
 # downloads source files ($1 is package repository, $2 is package name)
@@ -353,7 +366,7 @@ pkginfo() {
     if [[ $2 ]]; then
       # rename for syntax highlighting
       cp "$tmpdir/$1.PKGBUILD" "$tmpdir/PKGBUILD"
-      confirm_edit "${COLOR6}Edit $1 PKGBUILD with \$EDITOR? [Y/n]${ENDCOLOR} " "$tmpdir/PKGBUILD"
+      confirm_edit "${COLOR6}Edit $1 PKGBUILD with \$editor? [Y/n]${ENDCOLOR} " "$tmpdir/PKGBUILD"
       mv "$tmpdir/PKGBUILD" "$tmpdir/$1.PKGBUILD"
     fi
   fi
@@ -377,6 +390,14 @@ isoutofdate() {
   [[ "$(jshon -Q -e results -e OutOfDate -u < "$tmpdir/$1.info")" = "1" ]]
 }
 
+# List bundle package files
+listbundle() {
+  if [[ $bundle ]]; then
+    echo -e "${COLOR5}==>${ENDCOLOR} Packages to bundle"
+    echo ${bundle[@]} | sed 's/ /\n/g' | tee "$tmpdir/bundle.lst"
+  fi
+}
+
 # $1 is prompt, $2 is file
 confirm_edit() {
   if [[ (! -f "$2") || "$noconfirm" || "$noedit" ]]; then
@@ -384,7 +405,35 @@ confirm_edit() {
   fi
   echo -en "$1"
   if proceed; then
-    ${EDITOR:-vi} "$2"
+    $editor "$2"
+  fi
+}
+
+# Output status of aur packages ($1 is 0 for success or 1 for failure)
+buildstatus() {
+  if [[ $1 != 0 ]]; then
+    echo
+    echo -e "${COLOR7}==> ERROR:${ENDCOLOR} ${COLOR1}the build failed${ENDCOLOR}"
+  fi
+
+  echo -ne "${COLOR5}  ->${ENDCOLOR} ${COLOR1}Status${ENDCOLOR}"
+  [[ $success ]] && echo -ne "\t${COLOR4}built (${#success[@]}):${ENDCOLOR} $success"
+  [[ $failure ]] && echo -ne "\t${COLOR7}failed (${#failure[@]}):${ENDCOLOR} $failure"
+  echo ""
+
+  [[ $nofail = 1 && $1 != 0 ]] && exit 1
+}
+
+# Build install ($1 is package filename, $2 is dependency or explicit, $3 is package)
+buildinstall() {
+  if [[ $2 = dependency ]]; then
+    runasroot $PACMAN ${PACOPTS[@]} --asdeps -U "$1"
+    [[ $buildonly = 1 ]] && bundle+=("$1")
+    [[ $buildonly = 1 ]] && purgedeps+=("$3")
+  elif [[ $2 = explicit ]]; then
+    [[ $buildonly = 1 ]] && echo -e "${COLOR6}notice:${ENDCOLOR} $3 built -- not installing"
+    [[ $buildonly = 1 ]] && bundle+=("$1")
+    [[ $buildonly != 1 ]] && runasroot $PACMAN ${PACOPTS[@]} -U "$1"
   fi
 }
 
@@ -422,18 +471,17 @@ checkcache() {
   fi;
 }
 
+# Installs packages from cache ($1 is package filename, $2 is dependency or explicit)
 cacheinstall() {
   if [ "$cachevcs" = "1" ]; then
-    echo -e "${COLOR6}notice:$ENDCOLOR installing $pkg-$cachever from cache" 
+    pkgrelease="$pkg-$cachever"
   else
-    echo -e "${COLOR6}notice:$ENDCOLOR installing $pkg-$pkgver-$pkgrel from cache" 
+    pkgrelease="$pkg-$pkgver-$pkgrel"
   fi
 
-  if  [[ $2 = dependency ]]; then
-    runasroot $PACMAN ${PACOPTS[@]} --asdeps -U "$1"
-  elif [[ $2 = explicit ]]; then
-    runasroot $PACMAN ${PACOPTS[@]} -U "$1"
-  fi
+  echo -e "${COLOR6}notice:$ENDCOLOR installing $pkgrelease from cache" 
+  pkgfilename=$(ls ${savedir}/$pkgrelease-*$PKGEXT)
+  buildinstall $pkgfilename $2 $pkg
 }
 
 # Installs packages from aur ($1 is package, $2 is dependency or explicit)
@@ -471,7 +519,7 @@ aurinstall() {
   fi
 
   # Allow user to edit PKGBUILD
-  confirm_edit "${COLOR6}Edit $1 PKGBUILD with \$EDITOR? [Y/n]${ENDCOLOR} " PKGBUILD
+  confirm_edit "${COLOR6}Edit $1 PKGBUILD with \$editor? [Y/n]${ENDCOLOR} " PKGBUILD
   if ! [[ -f PKGBUILD ]]; then
     err "No PKGBUILD found in directory."
   fi
@@ -479,7 +527,7 @@ aurinstall() {
   # Allow user to edit .install
   unset install
   . PKGBUILD
-  confirm_edit "${COLOR6}Edit $install with \$EDITOR? [Y/n]${ENDCOLOR} " "$install"
+  confirm_edit "${COLOR6}Edit $install with \$editor? [Y/n]${ENDCOLOR} " "$install"
 
   # Installation (makepkg and pacman)
   rm -f *$PKGEXT
@@ -491,23 +539,28 @@ aurinstall() {
     makepkg $MAKEPKGOPTS -f
   fi
 
-  [[ $? -ne 0 ]] && echo "The build failed." && return 1
+  # Build check
+  if [[ $? -ne 0 ]]; then
+    failure+=("$1")
+    buildstatus 1
+  else
+    success+=("$1")
+    buildstatus 0
+  fi
+
   pkgtarfiles=""
   for i in "${pkgname[@]}"; do
     pkgtarfiles="$pkgtarfiles $i-*$PKGEXT"
   done
 
   # Save packages
-  if [ ! -d $savedir ]; then
-    runasroot mkdir -p $savedir
-  fi
-  runasroot cp $pkgname-*$PKGEXT $savedir/
-  echo -e "${COLOR5}  -> ${COLOR1}Saved package:$ENDCOLOR $(ls $pkgname-*$PKGEXT)";
-
-  if  [[ $2 = dependency ]]; then
-    runasroot $PACMAN ${PACOPTS[@]} --asdeps -U $pkgtarfiles
-  elif [[ $2 = explicit ]]; then
-    runasroot $PACMAN ${PACOPTS[@]} -U $pkgtarfiles
+  pkgtar=$(ls $pkgname-*$PKGEXT 2>/dev/null | tail -n 1)
+  if [[ $pkgtar ]]; then
+    [ -d $savedir ] || runasroot mkdir -p $savedir
+    runasroot cp $pkgname-*$PKGEXT $savedir/
+    echo -e "${COLOR5}  -> ${COLOR1}Saved package:${ENDCOLOR} $(ls $pkgname-*$PKGEXT)";
+    pkgfilename=$(ls $pkgname-*$PKGEXT)
+    buildinstall ${savedir}/$pkgfilename $2 $pkgname
   fi
 }
 
@@ -566,16 +619,25 @@ installhandling() {
  
   # First install the explicit pacman packages, let pacman prompt
   if [[ $pacmanpackages ]]; then
-    runasroot $PACMAN "${PACOPTS[@]}" -S -- "${pacmanpackages[@]}"
+    echo -e "${COLOR6}Pacman Targets    ($((${#pacmanpackages[@]}))):${ENDCOLOR} ${pacmanpackages[@]}"
+    echo
+    if [[ $buildonly = 1 ]]; then
+      downfile=$($PACMAN -Sp -- "${pacmanpackages[@]}" | awk -v dir=$downdir -F "/" '{print dir"/"$NF}')
+      bundle+=("${downfile}")
+      runasroot $PACMAN "${PACOPTS[@]}" -Sw --cachedir $downdir -- "${pacmanpackages[@]}"
+    else
+      runasroot $PACMAN "${PACOPTS[@]}" -S -- "${pacmanpackages[@]}"
+    fi
   fi
   if [[ -z $aurtargets ]]; then
+    listbundle
     exit
   fi
 
   # Test if aurpackages are already installed; echo warning if so
   for pkg in "${aurtargets[@]}"; do
     if existsinlocal "$pkg"; then
-      localversion="$($PACMAN -Qs "$pkg" | grep -F "local/$pkg " | cut -d ' ' -f 2)"
+      localversion="$($pacmanbin -Qs "$pkg" | grep -F "local/$pkg " | cut -d ' ' -f 2)"
       if ! aurversionisnewer "$pkg" "$localversion"; then
         if [ "$needed" = "1" ]; then
           echo -e "${COLOR6}notice:$ENDCOLOR $pkg-$localversion is up to date -- skipping" 
@@ -615,7 +677,8 @@ installhandling() {
   fi
 
   # Prompt to proceed
-  echo -en "\nProceed with installation? [Y/n] "
+  [[ $buildonly = 1 ]] && phrasing="building" || phrasing="installation"
+  echo -en "\nProceed with ${phrasing}? [Y/n] "
   if ! [[ $noconfirm ]]; then
     proceed || exit
   else
@@ -624,6 +687,10 @@ installhandling() {
 
   # Install pacman dependencies
   if [[ $pacmandepends ]]; then
+    if [[ $buildonly = 1 ]]; then
+      downfile=$($PACMAN -Sp -- "${pacmandepends[@]}" | awk -v dir=$downdir -F "/" '{print dir"/"$NF}')
+      bundle+=("${downfile}")
+    fi
     runasroot $PACMAN --noconfirm --asdeps -S -- "${pacmandepends[@]}" || err "Installation failed."
   fi 
 
@@ -637,7 +704,7 @@ installhandling() {
   # Install the aur packages
   for package in "${aurtargets[@]}"; do
     scrapeaurdeps "$package"
-    if $PACMAN -T "${dependencies[@]}" &>/dev/null; then
+    if $pacmanbin -T "${dependencies[@]}" &>/dev/null; then
       checkcache "$package" "explicit"
     else
       echo "Dependencies for \`$package' are not met, not building..."
@@ -645,14 +712,19 @@ installhandling() {
   done
 
   # Remove build dependencies
-  if [[ $purgedeps ]]; then
-    runasroot $PACMAN --noconfirm -R -- "${purgedeps[@]}"
+  if [[ $buildonly = 1 ]]; then
+    purgedeps+=("${pacmandepends[@]}")
   fi
+  if [[ $purgedeps ]]; then
+    purgedepends=( $(echo -e "${purgedeps[*]}" | sort -u) )
+    runasroot $pacmanbin --noconfirm -Ru -- "${purgedepends[@]}" 2>/dev/null
+  fi
+  listbundle
 }
 
 run_quick_check() {
-  bigurl="https://aur.archlinux.org/rpc.php?type=multiinfo"
-  for p in $($PACMAN -Qqm); do
+  bigurl="$RPCURL=multiinfo"
+  for p in $($pacmanbin -Qqm); do
     bigurl="$bigurl&arg\[\]=$p"
   done
   parsed_aur="$(curl -s "$bigurl" | \
@@ -672,8 +744,8 @@ run_quick_check() {
   DBPath="${DBPath:-/var/lib/pacman/}"
   mkdir -p "$CHECKUPDATE_DB"
   ln -s "${DBPath}/local" "$CHECKUPDATE_DB" &> /dev/null
-  fakeroot $PACMAN -Sqy --dbpath "$CHECKUPDATE_DB" &> /dev/null
-  $PACMAN -Qqu --dbpath "$CHECKUPDATE_DB" 2> /dev/null 
+  fakeroot $pacmanbin -Sqy --dbpath "$CHECKUPDATE_DB" &> /dev/null
+  $pacmanbin -Qqu --dbpath "$CHECKUPDATE_DB" 2> /dev/null 
 }
 
 # proceed with installation prompt
@@ -696,9 +768,9 @@ nap() {
 # Wrap pacman parameters
 pacwrap() {
   if [[ $1 = -Q* ]]; then
-    $PACMAN "$@";
+    $pacmanbin "$@";
   else
-    runasroot $PACMAN "$@";
+    runasroot $pacmanbin "$@";
   fi;
   exit 0;
 }
@@ -716,6 +788,7 @@ while [[ $1 ]]; do
     '-G') option=download ;;
     -L*) option=list ; pacmanarg="${1//-L}" ;;
     '--auronly') auronly='1' ; unset noaur ;;
+    '--buildonly') buildonly='1' ;;
     '--cachevcs') cachevcs='1' ;;
     '--config') config='1' ; apacmanconf="$2" ; shift ;;
     '--devel') devel='1' ;;
@@ -725,6 +798,7 @@ while [[ $1 ]]; do
     '--noaur') noaur='1' ; unset auronly ;;
     '--noconfirm') noconfirm='1' PACOPTS+=("--noconfirm");;
     '--noedit') noedit='1' ;;
+    '--nofail') nofail='1' ;;
     '--preview') preview='1' ;;
     '--purgebuild') purgebuild='1' ;;
     '--quickcheck') quickcheck='1' ;;
@@ -737,7 +811,13 @@ while [[ $1 ]]; do
     '-v'|'--verbose') verbose='1' ;;
     '-V'|'--version') version ;;
     '--') shift ; packageargs+=("$@") ; break ;;
-    -*) pacwrap "$@" ;;
+    -D*) pacwrap "$@" ;;
+    -Q*) pacwrap "$@" ;;
+    -R*) pacwrap "$@" ;;
+    -S*) pacwrap "$@" ;;
+    -T*) pacwrap "$@" ;;
+    -U*) pacwrap "$@" ;;
+    -*) invalid "$@" ;;
     *) packageargs+=("$1") ;;
   esac
   shift
@@ -787,7 +867,7 @@ if [[ $option = update ]]; then
   total=0
   if ! [[ $noaur ]]; then
     echo -e "${COLOR5}:: ${COLOR1}Synchronizing aur database...${ENDCOLOR}"
-    IFS=$'\n' read -rd '' -a packages < <($PACMAN -Qm)
+    IFS=$'\n' read -rd '' -a packages < <($pacmanbin -Qm)
     newpackages=()
     checkignores=()
     total="${#packages[@]}"
@@ -900,9 +980,9 @@ if [[ $option = search || $option = searchinstall ]]; then
   # Pacman searching 
   if ! [[ $auronly ]]; then
     if [[ $quiet ]]; then
-      results="$($PACMAN -Ssq -- "${packageargs[@]}")"
+      results="$($pacmanbin -Ssq -- "${packageargs[@]}")"
     else
-      results="$($PACMAN -Ss -- "${packageargs[@]}")"
+      results="$($pacmanbin -Ss -- "${packageargs[@]}")"
       results="$(sed -r "s|^[^ ][^/]*/|$S${COLOR3}&$S${COLOR1}|" <<< "$results")"
       results="$(sed -r "s|^([^ ]+) ([^ ]+)(.*)$|\1 $S${COLOR2}\2$S${ENDCOLOR}\3|" <<< "$results")"
     fi
@@ -911,7 +991,7 @@ if [[ $option = search || $option = searchinstall ]]; then
     else  # interactive
       echo -e "$results" | fmt -"$_WIDTH" -s | nl -v 0 -w 1 -s ' ' -b 'p^[^ ]'
     fi | sed '/^$/d'
-    pacname=( $($PACMAN -Ssq -- "${packageargs[@]}") )
+    pacname=( $($pacmanbin -Ssq -- "${packageargs[@]}") )
     pactotal="${#pacname[@]}"
   else
     pactotal=0
@@ -1000,7 +1080,7 @@ if [[ $option = info ]]; then
   sourcemakepkgconf
   for package in "${packageargs[@]}"; do
     if ! [[ $auronly ]] && existsinpacman "$package"; then
-      results="$($PACMAN -Si -- "$package")"
+      results="$($pacmanbin -Si -- "$package")"
       results="$(sed -r "s|^(Repository[^:]*:)(.*)$|\1$S${COLOR3}\2$S${ENDCOLOR}|" <<< "$results")"
       results="$(sed -r "s|^(Name[^:]*:)(.*)$|\1$S${COLOR1}\2$S${ENDCOLOR}|" <<< "$results")"
       results="$(sed -r "s|^(Version[^:]*:)(.*)$|\1$S${COLOR2}\2$S${ENDCOLOR}|" <<< "$results")"
