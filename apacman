@@ -1,7 +1,7 @@
 #!/bin/bash
 ######################################################################
 # apacman - AUR wrapper forked from packer
-version="1.3"
+version="1.4"
 # Copyright OS Hazard <oshazard+aur@gmail.com>
 #
 # New Features:
@@ -424,31 +424,29 @@ buildstatus() {
   [[ $nofail = 1 && $1 != 0 ]] && exit 1
 }
 
-# Build install ($1 is package filename, $2 is dependency or explicit, $3 is package)
+# Build install ($1 is package, $2 is dependency or explicit, $3 is filename)
 buildinstall() {
   if [[ $2 = dependency ]]; then
-    runasroot $PACMAN ${PACOPTS[@]} --asdeps -U "$1"
-    [[ $buildonly = 1 ]] && bundle+=("$1")
-    [[ $buildonly = 1 ]] && purgedeps+=("$3")
+    runasroot $PACMAN ${PACOPTS[@]} --asdeps -U "$3"
+    [[ $buildonly = 1 ]] && bundle+=("$3")
+    [[ $buildonly = 1 ]] && purgedeps+=("$1")
   elif [[ $2 = explicit ]]; then
-    [[ $buildonly = 1 ]] && echo -e "${COLOR6}notice:${ENDCOLOR} $3 built -- not installing"
-    [[ $buildonly = 1 ]] && bundle+=("$1")
-    [[ $buildonly != 1 ]] && runasroot $PACMAN ${PACOPTS[@]} -U "$1"
+    [[ $buildonly = 1 ]] && echo -e "${COLOR6}notice:${ENDCOLOR} $1 built -- not installing"
+    [[ $buildonly = 1 ]] && bundle+=("$3")
+    [[ $buildonly != 1 ]] && runasroot $PACMAN ${PACOPTS[@]} -U "$3"
   fi
 }
 
 # Checks if aur cache is newer than aur ($1 is package, $2 is aur version)
 checkvcs() {
-  if [ "$cachevcs" = "1" ]; then
-  cachefile=$(ls --sort=time ${savedir}/${1}-*-{any,${makearch}}.pkg.{tar,tar.xz} 2>/dev/null | awk NR==1 | awk -F "${savedir}/${1}-" '{print $2}');
+  cachefile=$(ls -t ${savedir}/${1}-*-{any,${makearch}}.pkg.{tar,tar.xz} 2>/dev/null | awk NR==1 | awk -F "${savedir}/${1}-" '{print $2}');
   cachever=$(echo "$cachefile" | sed "s/-any.pkg.tar.xz//g;s/-any.pkg.tar//g;s/-${makearch}.pkg.tar.xz//g;s/-${makearch}.pkg.tar//g");
-    if [[ "$(LC_ALL=C vercmp "$cachever" "$2")" -gt 0 ]]; then
-      echo -e "${COLOR7}warning:${ENDCOLOR} $pkg -- ${COLOR7}verify cache newer than AUR${ENDCOLOR} ($pkgver-$pkgrel)" 
-      pkgfile="${savedir}/${1}-${cachefile}";
-    elif [[ "$(LC_ALL=C vercmp "$cachever" "$2")" -eq 0 ]]; then
-      pkgfile="${savedir}/${1}-${cachefile}";
-    fi
-  fi;
+  if [[ "$(LC_ALL=C vercmp "$cachever" "$2")" -gt 0 ]]; then
+    echo -e "${COLOR7}warning:${ENDCOLOR} $1 -- ${COLOR7}verify cache newer than AUR${ENDCOLOR} ($pkgver-$pkgrel)" 
+    pkgfile="${savedir}/${1}-${cachefile}";
+  elif [[ "$(LC_ALL=C vercmp "$cachever" "$2")" -eq 0 ]]; then
+    pkgfile="${savedir}/${1}-${cachefile}";
+  fi
 }
 
 # Checks if packages are in aur cache ($1 is package, $2 is dependency or explicit)
@@ -465,23 +463,22 @@ checkcache() {
   fi
 
   if [ -f "$pkgfile" ]; then
-    cacheinstall "$pkgfile" "$2"
+    cacheinstall "$1" "$2" "$pkgfile"
   else
     aurinstall "$1" "$2"
   fi;
 }
 
-# Installs packages from cache ($1 is package filename, $2 is dependency or explicit)
+# Installs packages from cache ($1 is package, $2 is dependency or explicit, $3 is filename)
 cacheinstall() {
   if [ "$cachevcs" = "1" ]; then
-    pkgrelease="$pkg-$cachever"
+    pkgrelease="$1-$cachever"
   else
-    pkgrelease="$pkg-$pkgver-$pkgrel"
+    pkgrelease="$1-$pkgver-$pkgrel"
   fi
 
-  echo -e "${COLOR6}notice:$ENDCOLOR installing $pkgrelease from cache" 
-  pkgfilename=$(ls ${savedir}/$pkgrelease-*$PKGEXT)
-  buildinstall $pkgfilename $2 $pkg
+  echo -e "${COLOR6}notice:$ENDCOLOR installing $pkgrelease from cache"
+  buildinstall $1 $2 $3
 }
 
 # Installs packages from aur ($1 is package, $2 is dependency or explicit)
@@ -560,7 +557,7 @@ aurinstall() {
     runasroot cp $pkgname-*$PKGEXT $savedir/
     echo -e "${COLOR5}  -> ${COLOR1}Saved package:${ENDCOLOR} $(ls $pkgname-*$PKGEXT)";
     pkgfilename=$(ls $pkgname-*$PKGEXT)
-    buildinstall ${savedir}/$pkgfilename $2 $pkgname
+    buildinstall $pkgname $2 ${savedir}/$pkgfilename
   fi
 }
 

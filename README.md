@@ -4,6 +4,7 @@ apacman
 ArchLinux User Repository (AUR) helper and pacman wrapper forked from packer
 
 Features:
+* (**new**) Bug fix for saved AUR packages and --cachevcs
 * (**new**) Bug fix for pacmatic
 * (**new**) Build status log
 * (**new**) Override EDITOR for PKGBUILDs in config file
