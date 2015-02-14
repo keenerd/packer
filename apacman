@@ -417,8 +417,8 @@ buildstatus() {
   fi
 
   echo -ne "${COLOR5}  ->${ENDCOLOR} ${COLOR1}Status${ENDCOLOR}"
-  [[ $success ]] && echo -ne "\t${COLOR4}built (${#success[@]}):${ENDCOLOR} $success"
-  [[ $failure ]] && echo -ne "\t${COLOR7}failed (${#failure[@]}):${ENDCOLOR} $failure"
+  [[ $success ]] && echo -ne "\t${COLOR4}built (${#success[@]}):${ENDCOLOR} ${success[@]}"
+  [[ $failure ]] && echo -ne "\t${COLOR7}failed (${#failure[@]}):${ENDCOLOR} ${failure[@]}"
   echo ""
 
   [[ $nofail = 1 && $1 != 0 ]] && exit 1
