@@ -1,7 +1,7 @@
 #!/bin/bash
 ######################################################################
 # apacman - AUR wrapper forked from packer
-version="1.4"
+version="1.5"
 # Copyright OS Hazard <oshazard+aur@gmail.com>
 #
 # New Features:
@@ -10,6 +10,7 @@ version="1.4"
 # * Workaround for running as root
 # * Saves AUR packages to /var/cache/apacman/pkg
 # * Uses AUR package cache directory if applicable
+# * --nosource    for security do not source PKGBUILDs (WIP)
 # * --buildonly   create but do not install packages
 # * --nofail      do not continue if a package fails to build
 # * --purgebuild  remove unneeded build dependencies
@@ -126,6 +127,7 @@ usage() {
   echo '    --noconfirm  - do not prompt for any confirmation'
   echo '    --noedit     - do not prompt to edit files'
   echo '    --nofail     - do not continue if a package fails to build'
+  echo '    --nosource   - do not source PKGBUILDs (WIP)'
   echo '    --preview    - edit pkgbuild before sourcing'
   echo '    --purgebuild - remove unneeded build dependencies'
   echo '    --quickcheck - check for updates and exit'
@@ -171,6 +173,40 @@ runasroot() {
   else
     echo -n "root "
     su -c "$(printf '%q ' "$@")"
+  fi
+}
+
+# FIXME
+parser() {
+  if [ -f "$1" ]; then
+    if [[ $nosource == 1 ]]; then
+      unset pkgname pkgver pkgrel arch checkdepends makedepends depends
+      pkgname=$(grep -o "^pkgname=\S*" "$1" | awk -F = '{print $2}' | tr -dc 'a-z0-9-_.\n');
+      pkgver=$(grep -o "^pkgver=\S*" "$1" | awk -F = '{print $2}' | tr -dc 'a-z0-9-_.\n');
+      pkgrel=$(grep -o "^pkgrel=\S*" "$1" | awk -F = '{print $2}' | tr -dc 'a-z0-9-_.\n');
+      _arch=$(grep "^arch=" "$1" | awk -F = '{print $2}' | tr -dc 'a-z0-9-_. \n');
+      _checkdepends=$(grep "^checkdepends=" "$1" | awk -F = '{print $2}' | tr -dc 'a-z0-9-_. \n');
+      _makedepends=$(grep "^makedepends=" "$1" | awk -F = '{print $2}' | tr -dc 'a-z0-9-_. \n');
+      _depends=$(grep "^depends=" "$1" | awk -F = '{print $2}' | tr -dc 'a-z0-9-_. \n');
+
+      for _machine in $_arch; do arch+=("$_machine"); done
+      for _pkg in $_checkdepends; do depends+=("$_pkg"); done
+      for _pkg in $_makedepends; do makedepends+=("$_pkg"); done
+      for _pkg in $_depends; do depends+=("$_pkg"); done
+
+      echo "==> pkgname: $pkgname"
+      echo "==> pkgver: $pkgver"
+      echo "==> pkgrel: $pkgrel"
+      echo "==> arch: ${arch[@]}"
+      echo "==> checkdepends: ${checkdepends[@]}"
+      echo "==> makedepends: ${makedepends[@]}"
+      echo "==> depends: ${depends[@]}"
+      return 0
+    else
+      . "$1"
+    fi
+  else
+    return 1
   fi
 }
 
@@ -239,7 +275,7 @@ existsinlocal() {
 # Scrapes the aur deps from PKGBUILDS and puts in globally available dependencies array
 scrapeaurdeps() {
   pkginfo "$1" "$preview"
-  . "$tmpdir/$1.PKGBUILD"
+  parser "$tmpdir/$1.PKGBUILD"
   [[ $skiptest = 1 ]] && unset checkdepends
   IFS=$'\n'
   dependencies=( $(echo -e "${depends[*]}\n${makedepends[*]}\n${checkdepends[*]}" | sed -e 's/=.*//' -e 's/>.*//' -e 's/<.*//'| sort -u) )
@@ -488,7 +524,7 @@ aurinstall() {
 
   # Prepare the installation directory
   # If there is an old directory and aurversion is not newer, use old directory
-  if . "$dir/$1/PKGBUILD" &>/dev/null && ! aurversionisnewer "$1" "$pkgver-$pkgrel"; then
+  if parser "$dir/$1/PKGBUILD" &>/dev/null && ! aurversionisnewer "$1" "$pkgver-$pkgrel"; then
     cd "$dir/$1"
   else
     [[ -d "$dir" ]] && rm -rf "$dir"
@@ -523,7 +559,7 @@ aurinstall() {
 
   # Allow user to edit .install
   unset install
-  . PKGBUILD
+  parser PKGBUILD
   confirm_edit "${COLOR6}Edit $install with \$editor? [Y/n]${ENDCOLOR} " "$install"
 
   # Installation (makepkg and pacman)
@@ -796,6 +832,7 @@ while [[ $1 ]]; do
     '--noconfirm') noconfirm='1' PACOPTS+=("--noconfirm");;
     '--noedit') noedit='1' ;;
     '--nofail') nofail='1' ;;
+    '--nosource') nosource='1' ;;
     '--preview') preview='1' ;;
     '--purgebuild') purgebuild='1' ;;
     '--quickcheck') quickcheck='1' ;;
@@ -893,7 +930,7 @@ if [[ $option = update ]]; then
         continue
       fi
       unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
-      . "$tmpdir/$pkg.PKGBUILD"
+      parser "$tmpdir/$pkg.PKGBUILD"
       if [[ "$(LC_ALL=C vercmp "$pkgver-$pkgrel" "$ver")" -gt 0 ]]; then
         newpackages+=("$pkg")
       elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
@@ -1088,7 +1125,7 @@ if [[ $option = info ]]; then
     elif ! [[ $noaur ]]; then # Check to see if it is in the aur
       pkginfo "$package" "$preview"
       [[ -s "$tmpdir/$package.PKGBUILD" ]] || err "${COLOR7}error:${ENDCOLOR} package '$package' was not found"
-      . "$tmpdir/$package.PKGBUILD"
+      parser "$tmpdir/$package.PKGBUILD"
 
       # Echo out the -Si formatted package information
       # Retrieve each element in order and echo them immediately
