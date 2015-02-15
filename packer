@@ -447,7 +447,7 @@ installhandling() {
 
   # Install pacman dependencies
   if [[ $pacmandepends ]]; then
-    runasroot $PACMAN --noconfirm --asdeps -S -- "${pacmandepends[@]}" || err "Installation failed."
+    runasroot $PACMAN --asdeps -S -- "${pacmandepends[@]}" || err "Installation failed."
   fi 
 
   # Install aur dependencies
@@ -496,7 +496,7 @@ run_quick_check() {
 
 # proceed with installation prompt
 proceed() {
-  read -n 1
+  read
   echo
   case "$REPLY" in
     'Y'|'y'|'') return 0 ;;
