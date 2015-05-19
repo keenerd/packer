@@ -1,7 +1,7 @@
 #!/bin/bash
 ######################################################################
 # apacman - AUR wrapper forked from packer
-version="1.5"
+version="1.6"
 # Copyright OS Hazard <oshazard+aur@gmail.com>
 #
 # New Features:
@@ -10,6 +10,7 @@ version="1.5"
 # * Workaround for running as root
 # * Saves AUR packages to /var/cache/apacman/pkg
 # * Uses AUR package cache directory if applicable
+# * --progress    transaction status in terminal titlebar
 # * --nosource    for security do not source PKGBUILDs (WIP)
 # * --buildonly   create but do not install packages
 # * --nofail      do not continue if a package fails to build
@@ -91,6 +92,11 @@ invalid() {
   echo -e "${COLOR7}error:${ENDCOLOR} invalid option \`$1'"
 }
 
+progress() {
+  [[ $progress == 1 || $progress == 3 ]] && echo -en "\033]2;$@\007"
+  [[ $progress == 2 || $progress == 3 ]] && notify-send "$@"
+}
+
 deptest() {
   type -p $1 &>/dev/null
 }
@@ -129,6 +135,7 @@ usage() {
   echo '    --nofail     - do not continue if a package fails to build'
   echo '    --nosource   - do not source PKGBUILDs (WIP)'
   echo '    --preview    - edit pkgbuild before sourcing'
+  echo '    --progress   - transaction status in terminal titlebar'
   echo '    --purgebuild - remove unneeded build dependencies'
   echo '    --quickcheck - check for updates and exit'
   echo '    --quiet      - only output package name for searches'
@@ -158,7 +165,7 @@ infoconf() {
   done
 
   vars="auronly buildonly cachevcs ignorearch needed noaur noconfirm noedit"
-  vars="$vars nofail preview purgebuild quiet skipcache skipinteg skiptest warn"
+  vars="$vars nofail preview progress purgebuild quiet skipcache skipinteg skiptest warn"
   for j in $vars; do
     varstatus $j
   done
@@ -498,9 +505,12 @@ checkcache() {
     checkvcs $1 $pkgver-$pkgrel
   fi
 
+  pkgnum=$((pkgnum+1))
   if [ -f "$pkgfile" ]; then
+    progress "Installing ${pkgnum}/${totalcount} $1"
     cacheinstall "$1" "$2" "$pkgfile"
   else
+    progress "Building ${pkgnum}/${totalcount} $1"
     aurinstall "$1" "$2"
   fi;
 }
@@ -704,6 +714,7 @@ installhandling() {
   fi
 
   # Sanity check
+  pkgnum="${#pacmandepends[@]}"
   totalcount="$((${#aurdepends[@]}+${#aurtargets[@]}+${#pacmandepends[@]}))"
   if [ "$totalcount" = "0" ]; then
     echo -e "${COLOR5}==>$ENDCOLOR nothing to do"; exit 0;
@@ -724,6 +735,7 @@ installhandling() {
       downfile=$($PACMAN -Sp -- "${pacmandepends[@]}" | awk -v dir=$downdir -F "/" '{print dir"/"$NF}')
       bundle+=("${downfile}")
     fi
+    progress "Installing ${pkgnum}/${totalcount} packages"
     runasroot $PACMAN --noconfirm --asdeps -S -- "${pacmandepends[@]}" || err "Installation failed."
   fi 
 
@@ -750,8 +762,10 @@ installhandling() {
   fi
   if [[ $purgedeps ]]; then
     purgedepends=( $(echo -e "${purgedeps[*]}" | sort -u) )
+    progress "Removing ${#purgedepends[@]} build depends"
     runasroot $pacmanbin --noconfirm -Ru -- "${purgedepends[@]}" 2>/dev/null
   fi
+
   listbundle
 }
 
@@ -834,6 +848,7 @@ while [[ $1 ]]; do
     '--nofail') nofail='1' ;;
     '--nosource') nosource='1' ;;
     '--preview') preview='1' ;;
+    '--progress') progress='1' ;;
     '--purgebuild') purgebuild='1' ;;
     '--quickcheck') quickcheck='1' ;;
     '--quiet') quiet='1' ;;
@@ -1019,6 +1034,7 @@ if [[ $option = search || $option = searchinstall ]]; then
       results="$($pacmanbin -Ss -- "${packageargs[@]}")"
       results="$(sed -r "s|^[^ ][^/]*/|$S${COLOR3}&$S${COLOR1}|" <<< "$results")"
       results="$(sed -r "s|^([^ ]+) ([^ ]+)(.*)$|\1 $S${COLOR2}\2$S${ENDCOLOR}\3|" <<< "$results")"
+      results="$(sed -e "s| \[|\\${COLOR4}&|" -e "s|\]|&\\${ENDCOLOR}|" <<< "$results")"
     fi
     if [[ $option = search ]]; then
       echo -e "$results" | fmt -"$_WIDTH" -s
@@ -1046,6 +1062,22 @@ if [[ $option = search || $option = searchinstall ]]; then
     done
     sed -i '/^$/d' "$tmpdir/search.results"
 
+    # Check versioning
+    localpkgs=$(pacman -Q)
+    for pkg in $(awk '{print $1}' "$tmpdir/search.results"); do
+      localver=$(echo "$localpkgs" | grep "^${pkg} " | awk '{print $2}');
+      if [ ! -z "$localver" ]; then
+        searchver=$(grep -E "^${pkg}[[:space:]]" "$tmpdir/search.results" | awk '{print $2}')
+        if [ "$searchver" = "$localver" ]; then
+          sed -i "s|$pkg[[:space:]]$searchver|& [installed]|" "$tmpdir/search.results"
+        elif [[ "$(LC_ALL=C vercmp "$searchver" "$localver")" -gt 0 ]]; then
+          sed -i "s|$pkg[[:space:]]$searchver|& [installed: $localver]|" "$tmpdir/search.results"
+        else
+          sed -i "s|$pkg[[:space:]]$searchver|& [local: $localver]|" "$tmpdir/search.results"
+        fi
+      fi
+    done
+
     # Prepare tmp file and arrays
     IFS=$'\n' read -rd '' -a aurname < <(cut -f 1 "$tmpdir/search.results")
     aurtotal="${#aurname[@]}"
@@ -1055,20 +1087,23 @@ if [[ $option = search || $option = searchinstall ]]; then
   fi
 
   # Echo out the -Ss formatted package information
-
   IFS=$'\t\n'
   if [[ $option = search ]]; then
     if [[ $quiet ]]; then
       printf "%s\n" ${aurname[@]}
     elif [[ -s "$tmpdir/search.results" ]]; then
-      printf "${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(cat "$tmpdir/search.results")
+      resultsaur="$(printf "${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(cat "$tmpdir/search.results"))"
+      resultsaur="$(sed -e "s| \[|\\${COLOR4}&|" -e "s|\] |&\\${ENDCOLOR}|" <<< "$resultsaur")"
+      echo -e "$resultsaur"
     fi
   else
     # interactive
     if [[ $quiet ]]; then
       nl -v ${pactotal:-0} -w 1 -s ' ' <(cut -f 1 "$tmpdir/search.results")
     elif [[ -s "$tmpdir/search.results" ]]; then
-      printf "%d ${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(nl -v ${pactotal:-0} -w 1 < "$tmpdir/search.results")
+      resultsaur="$(printf "%d ${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(nl -v ${pactotal:-0} -w 1 < "$tmpdir/search.results"))"
+      resultsaur="$(sed -e "s| \[|\\${COLOR4}&|" -e "s|\] |&\\${ENDCOLOR}|" <<< "$resultsaur")"
+      echo -e "$resultsaur"
     fi
   fi | fmt -"$_WIDTH" -s
   unset IFS
@@ -1133,6 +1168,7 @@ if [[ $option = info ]]; then
       echo -e "${COLOR1}Name           : $pkgname"
       echo -e "${COLOR1}Version        : ${COLOR2}$pkgver-$pkgrel"
       echo -e "${COLOR1}URL            : ${COLOR4}$url"
+      echo -e "${COLOR1}AUR            : ${COLOR4}$PKGURL/packages/$pkgname/"
       echo -e "${COLOR1}Licenses       : ${ENDCOLOR}${license[@]}"
       echo -e "${COLOR1}Groups         : ${ENDCOLOR}${groups[@]:-None}"
       echo -e "${COLOR1}Provides       : ${ENDCOLOR}${provides[@]:-None}"

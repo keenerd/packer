@@ -2,12 +2,12 @@
 .\"     Title: apacman.conf
 .\"    Author: [see the "Authors" section]
 .\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
-.\"      Date: 02/07/2015
+.\"      Date: 05/19/2015
 .\"    Manual: apacman Manual
 .\"    Source: apacman
 .\"  Language: English
 .\"
-.TH "APACMAN\&.CONF" "5" "02/07/2015" "apacman" "apacman Manual"
+.TH "APACMAN\&.CONF" "5" "05/19/2015" "apacman" "apacman Manual"
 .\" -----------------------------------------------------------------
 .\" * set default formatting
 .\" -----------------------------------------------------------------
@@ -111,6 +111,11 @@ Do not continue if a package fails to build\&.
 \fBpreview =\fR 1
 .RS 4
 Prompt to edit PKGBUILD and .install before building\&.
+.RE
+.PP
+\fBprogress =\fR 1
+.RS 4
+Status updates to terminal title (1) or libnotify (2) or both (3)\&.
 .RE
 .PP
 \fBpurgebuild =\fR 1

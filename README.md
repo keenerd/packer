@@ -4,13 +4,16 @@ apacman
 ArchLinux User Repository (AUR) helper and pacman wrapper forked from packer
 
 Features:
-* (**new**) Bug fix for saved AUR packages and --cachevcs
-* (**new**) Bug fix for pacmatic
-* (**new**) Build status log
-* (**new**) Override EDITOR for PKGBUILDs in config file
-* (**new**) --buildonly parameter to build but not AUR install packages
-* (**new**) --nofail parameter to quit if a package does not build
-* (**new**) --purgebuild parameter to remove unneeded build depends
+* (**new**) Display [installed], [installed: VER], or [local: VER] in -Ss
+* (**new**) --progress parameter sets terminal title to package status
+* (**new**) Add AUR link to -Si info
+* Bug fix for saved AUR packages and --cachevcs
+* Bug fix for pacmatic
+* Build status log
+* Override EDITOR for PKGBUILDs in config file
+* --buildonly parameter to build but not AUR install packages
+* --nofail parameter to quit if a package does not build
+* --purgebuild parameter to remove unneeded build depends
 * --skiptest to avoid installing unit test packages
 * Config file support (/etc/apacman.conf)
 * Cleaned up manpages
