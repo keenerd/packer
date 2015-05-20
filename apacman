@@ -532,6 +532,7 @@ cacheinstall() {
 }
 
 # Retrieve PGP keys ($@ is ${validpgpkeys[@]})
+export gpgconf
 addpgpkeys() {
   if [[ $1 ]]; then
     keyexists=$(gpg --fingerprint $@ 2>/dev/null)
