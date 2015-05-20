@@ -4,6 +4,7 @@ apacman
 ArchLinux User Repository (AUR) helper and pacman wrapper forked from packer
 
 Features:
+* (**new**) Signed package support (WIP)
 * (**new**) Display [installed], [installed: VER], or [local: VER] in -Ss
 * (**new**) --progress parameter sets terminal title to package status
 * (**new**) Add AUR link to -Si info

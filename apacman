@@ -1,11 +1,12 @@
 #!/bin/bash
 ######################################################################
 # apacman - AUR wrapper forked from packer
-version="1.6"
+version="1.7"
 # Copyright OS Hazard <oshazard+aur@gmail.com>
 #
 # New Features:
 # * Config file support
+# * Signed package support (WIP)
 # * Built-in ABS support (WIP)
 # * Workaround for running as root
 # * Saves AUR packages to /var/cache/apacman/pkg
@@ -572,6 +573,26 @@ aurinstall() {
   parser PKGBUILD
   confirm_edit "${COLOR6}Edit $install with \$editor? [Y/n]${ENDCOLOR} " "$install"
 
+  # Retrieve PGP keys
+  if [[ ${validpgpkeys[@]} ]]; then
+    keyexists=$(gpg --fingerprint ${validpgpkeys[@]} 2>/dev/null)
+  fi
+  if ! [[ $keyexists ]]; then
+    echo -e "\n${COLOR6}warning:${ENDCOLOR} One or more PGP signatures unknown"
+    for pgpkey in ${validpgpkeys[@]}; do
+      echo -e "\t${COLOR7}${validpgpkeys[@]}${ENDCOLOR}"
+    done
+    echo -en "${COLOR5}:: ${COLOR1}Verify PGP keys? [Y/n]${ENDCOLOR} "
+    if ! [[ $noconfirm ]]; then
+      proceed || exit
+    else
+      echo
+    fi
+    gpg --recv-key ${validpgpkeys[@]}
+    keycheck=$(gpg --fingerprint ${validpgpkeys[@]} 2>/dev/null)
+    echo
+  fi
+
   # Installation (makepkg and pacman)
   rm -f *$PKGEXT
   if [[ $UID -eq 0 ]]; then
@@ -580,6 +601,11 @@ aurinstall() {
     su -c "makepkg $MAKEPKGOPTS -f" aurbuild
   else
     makepkg $MAKEPKGOPTS -f
+  fi
+
+  # Remove added PGP keys
+  if [[ $keycheck ]]; then
+      gpg --batch --yes --delete-keys ${validpgpkeys[@]}
   fi
 
   # Build check
@@ -722,7 +748,7 @@ installhandling() {
 
   # Prompt to proceed
   [[ $buildonly = 1 ]] && phrasing="building" || phrasing="installation"
-  echo -en "\nProceed with ${phrasing}? [Y/n] "
+  echo -en "\n${COLOR5}:: ${COLOR1}Proceed with ${phrasing}? [Y/n]${ENDCOLOR} "
   if ! [[ $noconfirm ]]; then
     proceed || exit
   else
