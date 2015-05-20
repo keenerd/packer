@@ -530,6 +530,7 @@ cacheinstall() {
 
 # Installs packages from aur ($1 is package, $2 is dependency or explicit)
 aurinstall() {
+  unset validpgpkeys
   dir="${TMPDIR:-/tmp}/pkgbuild-$UID/$1"
   sourcemakepkgconf
 
