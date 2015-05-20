@@ -576,21 +576,21 @@ aurinstall() {
   # Retrieve PGP keys
   if [[ ${validpgpkeys[@]} ]]; then
     keyexists=$(gpg --fingerprint ${validpgpkeys[@]} 2>/dev/null)
-  fi
-  if ! [[ $keyexists ]]; then
-    echo -e "\n${COLOR6}warning:${ENDCOLOR} One or more PGP signatures unknown"
-    for pgpkey in ${validpgpkeys[@]}; do
-      echo -e "\t${COLOR7}${validpgpkeys[@]}${ENDCOLOR}"
-    done
-    echo -en "${COLOR5}:: ${COLOR1}Verify PGP keys? [Y/n]${ENDCOLOR} "
-    if ! [[ $noconfirm ]]; then
-      proceed || exit
-    else
+    if ! [[ $keyexists ]]; then
+      echo -e "\n${COLOR6}warning:${ENDCOLOR} One or more PGP signatures unknown"
+      for pgpkey in ${validpgpkeys[@]}; do
+        echo -e "\t${COLOR7}${validpgpkeys[@]}${ENDCOLOR}"
+      done
+      echo -en "${COLOR5}:: ${COLOR1}Verify PGP keys? [Y/n]${ENDCOLOR} "
+      if ! [[ $noconfirm ]]; then
+        proceed || exit
+      else
+        echo
+      fi
+      gpg --recv-key ${validpgpkeys[@]}
+      keycheck=$(gpg --fingerprint ${validpgpkeys[@]} 2>/dev/null)
       echo
     fi
-    gpg --recv-key ${validpgpkeys[@]}
-    keycheck=$(gpg --fingerprint ${validpgpkeys[@]} 2>/dev/null)
-    echo
   fi
 
   # Installation (makepkg and pacman)
