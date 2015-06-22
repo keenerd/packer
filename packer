@@ -236,7 +236,7 @@ rpcinfo() {
 
 pkglink() {
   rpcinfo $1
-  echo "$(jshon -Q -e results -e URLPath -u < "$tmpdir/$1.info")"
+  echo "${PKGURL}$(jshon -Q -e results -e URLPath -u < "$tmpdir/$1.info")"
 }
 
 # downloads pkgbuild ($1), edits if $2 is set
