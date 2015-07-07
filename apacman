@@ -408,7 +408,7 @@ abslink() {
 pkginfo() {
   if ! [[ -f "$tmpdir/$1.PKGBUILD" ]]; then
     pkgpath=$(pkglink $1)
-    curl -Lfs "${pkgpath%/*}/PKGBUILD" > "$tmpdir/$1.PKGBUILD"
+    curl -Lfs "${pkgpath%/*/*}/plain/PKGBUILD?h=${1}" > "$tmpdir/$1.PKGBUILD"
     if [[ $2 ]]; then
       # rename for syntax highlighting
       cp "$tmpdir/$1.PKGBUILD" "$tmpdir/PKGBUILD"
