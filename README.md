@@ -3,6 +3,8 @@ apacman
 
 ArchLinux User Repository (AUR) helper and pacman wrapper forked from packer
 
+[Migrate wizard for AUR4](https://gist.github.com/oshazard/370c7ed631af2181ee51)
+
 Features:
 * (**new**) Signed package support (WIP)
 * (**new**) Display [installed], [installed: VER], or [local: VER] in -Ss
