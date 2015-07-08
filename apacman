@@ -1,7 +1,7 @@
 #!/bin/bash
 ######################################################################
 # apacman - AUR wrapper forked from packer
-version="1.8"
+version="1.9"
 # Copyright OS Hazard <oshazard+aur@gmail.com>
 #
 # New Features:
@@ -11,6 +11,7 @@ version="1.8"
 # * Workaround for running as root
 # * Saves AUR packages to /var/cache/apacman/pkg
 # * Uses AUR package cache directory if applicable
+# * --legacy      backwards compatability for AUR3
 # * --progress    transaction status in terminal titlebar
 # * --nosource    for security do not source PKGBUILDs (WIP)
 # * --buildonly   create but do not install packages
@@ -53,6 +54,8 @@ apacmanconf='/etc/apacman.conf'
 gpgconf='/etc/pacman.d/gnupg/gpg.conf'
 downdir='/var/cache/pacman/pkg'
 savedir='/var/cache/apacman/pkg'
+builddir="${TMPDIR:-/tmp}/pkgbuild-$UID"
+tmpdir="${TMPDIR:-/tmp}/apacmantmp-$UID"
 
 editor="vi"
 [[ $EDITOR ]] && editor="$EDITOR"
@@ -60,11 +63,7 @@ editor="vi"
 RPCURL="https://aur.archlinux.org/rpc.php?type"
 PKGURL="https://aur.archlinux.org"
 ABSURL="rsync.archlinux.org"
-
-# set tmpfile stuff, clean tmpdir
-tmpdir="${TMPDIR:-/tmp}/apacmantmp-$UID"
-rm -rf "$tmpdir" &>/dev/null
-mkdir -p "$tmpdir"
+legacy="0"
 
 if [[ -t 1 && ! $COLOR = "NO" ]]; then
   COLOR1='\e[1;39m'
@@ -130,6 +129,7 @@ usage() {
   echo '    --devel      - update VCS (git, svn, hg) packages during -Su'
   echo '    --ignore     - takes a comma-separated list of packages to ignore'
   echo '    --ignorearch - ignore a missing or incomplete architecture field'
+  echo '    --legacy     - uses AUR3.0 instead of AUR4.0'
   echo '    --needed     - do not install up-to-date packages'
   echo '    --noaur      - do not actions for AUR'
   echo '    --noconfirm  - do not prompt for any confirmation'
@@ -161,12 +161,12 @@ varstatus() {
 }
 
 infoconf() {
-  vars="apacmanconf downdir editor makepkgconf pacmanconf savedir tmpdir usermakepkgconf"
+  vars="apacmanconf builddir downdir editor makepkgconf pacmanconf savedir tmpdir usermakepkgconf"
   for i in $vars; do
     varstatus $i
   done
 
-  vars="auronly buildonly cachevcs ignorearch needed noaur noconfirm noedit"
+  vars="auronly buildonly cachevcs ignorearch legacy needed noaur noconfirm noedit"
   vars="$vars nofail preview progress purgebuild quiet skipcache skipinteg skiptest warn"
   for j in $vars; do
     varstatus $j
@@ -408,7 +408,12 @@ abslink() {
 pkginfo() {
   if ! [[ -f "$tmpdir/$1.PKGBUILD" ]]; then
     pkgpath=$(pkglink $1)
-    curl -Lfs "${pkgpath%/*/*}/plain/PKGBUILD?h=${1}" > "$tmpdir/$1.PKGBUILD"
+    if [[ $legacy == 1 ]]; then
+      curl -Lfs "${pkgpath%/*}/PKGBUILD" > "$tmpdir/$1.PKGBUILD"
+    else
+      curl -Lfs "${pkgpath%/*/*}/plain/PKGBUILD?h=${1}" > "$tmpdir/$1.PKGBUILD"
+    fi
+
     if [[ $2 ]]; then
       # rename for syntax highlighting
       cp "$tmpdir/$1.PKGBUILD" "$tmpdir/PKGBUILD"
@@ -565,7 +570,7 @@ removepgpkeys() {
 # Installs packages from aur ($1 is package, $2 is dependency or explicit)
 aurinstall() {
   unset validpgpkeys
-  dir="${TMPDIR:-/tmp}/pkgbuild-$UID/$1"
+  dir="${builddir}/$1"
   sourcemakepkgconf
 
   # Prepare the installation directory
@@ -615,7 +620,6 @@ aurinstall() {
     mkdir -p /var/empty/.gnupg
     chown -R aurbuild:aurbuild . /var/empty/.gnupg
     su -c "gpg --refresh-keys" aurbuild
-    #su -c "dirmngr </dev/null" aurbuild
     su -c "addpgpkeys ${validpgpkeys[@]}" aurbuild
     su -c "makepkg $MAKEPKGOPTS -f" aurbuild
     su -c "removepgpkeys ${validpgpkeys[@]}" aurbuild
@@ -884,6 +888,7 @@ while [[ $1 ]]; do
     '--devel') devel='1' ;;
     '--ignore') ignorearg="$2" ; PACOPTS+=("--ignore" "$2") ; shift ;;
     '--ignorearch') MAKEPKGOPTS+=("--ignorearch");;
+    '--legacy') legacy='1' ;;
     '--needed') needed='1' PACOPTS+=("--needed");;
     '--noaur') noaur='1' ; unset auronly ;;
     '--noconfirm') noconfirm='1' PACOPTS+=("--noconfirm") ; export noconfirm ;;
@@ -918,8 +923,18 @@ done
 # Override defaults
 sourceapacmanconf
 
+# Set tmpfile stuff, clean tmpdir
+rm -rf "$tmpdir" &>/dev/null
+mkdir -p "$tmpdir"
+
 # Determine architecture
 makearch=$(grep ^CARCH= "$makepkgconf" 2>/dev/null | grep -o -e =.*[0-9A-Za-z] | sed 's/^="//');
+
+# AUR4 compatibility
+if [[ $legacy != 1 ]]; then
+  RPCURL=$(echo "$RPCURL" | sed 's/\./4&/1')
+  PKGURL=$(echo "$PKGURL" | sed 's/\./4&/1')
+fi
 
 # Check for new packages
 if [[ $quickcheck == 1 ]]; then
