@@ -6,10 +6,16 @@ ArchLinux User Repository (AUR) helper and pacman wrapper forked from packer
 [Migrate wizard for AUR4](https://gist.github.com/oshazard/370c7ed631af2181ee51)
 
 Features:
-* (**new**) Signed package support (WIP)
-* (**new**) Display [installed], [installed: VER], or [local: VER] in -Ss
-* (**new**) --progress parameter sets terminal title to package status
-* (**new**) Add AUR link to -Si info
+* Split package support and shared source
+* Improved AUR4 support
+* Bug fix for AUR4 -Si
+* Bug fix for built/failed
+* --legacy flag for AUR3
+* Preliminary AUR4 support
+* Signed package support
+* Display [installed], [installed: VER], or [local: VER] in -Ss
+* --progress parameter sets terminal title to package status
+* Add AUR link to -Si info
 * Bug fix for saved AUR packages and --cachevcs
 * Bug fix for pacmatic
 * Build status log

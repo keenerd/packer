@@ -1,17 +1,19 @@
 #!/bin/bash
 ######################################################################
 # apacman - AUR wrapper forked from packer
-version="1.9"
+version="2.0"
 # Copyright OS Hazard <oshazard+aur@gmail.com>
 #
 # New Features:
+# * Split package support
+# * AUR4 support
 # * Config file support
-# * Signed package support (WIP)
+# * Signed package support
 # * Built-in ABS support (WIP)
 # * Workaround for running as root
 # * Saves AUR packages to /var/cache/apacman/pkg
 # * Uses AUR package cache directory if applicable
-# * --legacy      backwards compatability for AUR3
+# * --legacy      backwards compatability for AUR3 (deprecated)
 # * --progress    transaction status in terminal titlebar
 # * --nosource    for security do not source PKGBUILDs (WIP)
 # * --buildonly   create but do not install packages
@@ -185,6 +187,16 @@ runasroot() {
   fi
 }
 
+# Extract from AUR4 .info
+infoparser() {
+  pkgname=$(jshon -Qe results < $1 -Qe Name -u)
+  pkgver=$(jshon -Qe results < $1 -Qe Version -u)
+  pkgbase=$(jshon -Qe results < $1 -Qe PackageBase -u)
+  url=$(jshon -Qe results < $1 -Qe URL -u)
+  license=($(jshon -Qe results < $1 -Qe License -u))
+  groups=$(jshon -Qe results < $1 -Qe PackageBase -u)
+}
+
 # FIXME
 parser() {
   if [ -f "$1" ]; then
@@ -217,6 +229,11 @@ parser() {
   else
     return 1
   fi
+}
+
+# grep PKGBUILD arrays ($1 is array var)
+pkgbuildgrep() {
+  grep "^${1}=" PKGBUILD 2>/dev/null | awk -F = '{print $2}' | tr -dc 'a-z0-9-_. \n';
 }
 
 # Source apacman.conf file
@@ -408,10 +425,11 @@ abslink() {
 pkginfo() {
   if ! [[ -f "$tmpdir/$1.PKGBUILD" ]]; then
     pkgpath=$(pkglink $1)
+    basepath=$(echo ${pkgpath##*/} | awk -F . '{print $1}')
     if [[ $legacy == 1 ]]; then
       curl -Lfs "${pkgpath%/*}/PKGBUILD" > "$tmpdir/$1.PKGBUILD"
     else
-      curl -Lfs "${pkgpath%/*/*}/plain/PKGBUILD?h=${1}" > "$tmpdir/$1.PKGBUILD"
+      curl -Lfs "${pkgpath%/*/*}/plain/PKGBUILD?h=${basepath}" > "$tmpdir/$1.PKGBUILD"
     fi
 
     if [[ $2 ]]; then
@@ -575,12 +593,12 @@ aurinstall() {
 
   # Prepare the installation directory
   # If there is an old directory and aurversion is not newer, use old directory
-  if parser "$dir/$1/PKGBUILD" &>/dev/null && ! aurversionisnewer "$1" "$pkgver-$pkgrel"; then
-    cd "$dir/$1"
+  if parser "$dir/PKGBUILD" &>/dev/null && ! aurversionisnewer "$1" "$pkgver-$pkgrel"; then
+    cd "$dir"
   else
     [[ -d "$dir" ]] && rm -rf "$dir"
-    mkdir -p "$dir"
-    cd "$dir"
+    mkdir -p "$builddir"
+    cd "$builddir"
     curl -Lfs "$(pkglink $1)" > "$1.tar.gz"
     mkdir "$1"
     tar xf "$1.tar.gz" -C "$1" --strip-components=1
@@ -595,7 +613,23 @@ aurinstall() {
     fi
   fi
 
-  # check for missing arch
+  # Check for split PKGBUILD
+  unset pkgtarget
+  pkgbase=($(pkgbuildgrep pkgbase));
+  pkgname=($(pkgbuildgrep pkgname));
+  if [[ "${pkgbase[@]}" ]]; then
+    echo -e "  ${COLOR5}->${ENDCOLOR}${COLOR1} Split package base: ${pkgbase[@]}${ENDCOLOR}";
+    if [[ "${#pkgname[@]}" -gt 1 ]]; then
+      echo -e "  ${COLOR5}->${ENDCOLOR}${COLOR1} PKGBUILD contains: ${pkgname[@]}${ENDCOLOR}";
+      pkgtarget="--pkg $1"
+      for split in ${pkgname[@]}; do
+        ln -s "${builddir}/$1" "${builddir}/$split" 2>/dev/null;
+      done
+    fi
+  fi
+
+  # Check for missing arch
+  arch=($(pkgbuildgrep arch));
   if [[ ! " ${arch[@]} " =~ " any " ]]; then
     if [[ ! " ${arch[@]} " =~ " ${CARCH} " ]]; then
       echo -e "${COLOR6}warning:$ENDCOLOR $CARCH missing from arch array"
@@ -621,16 +655,16 @@ aurinstall() {
     chown -R aurbuild:aurbuild . /var/empty/.gnupg
     su -c "gpg --refresh-keys" aurbuild
     su -c "addpgpkeys ${validpgpkeys[@]}" aurbuild
-    su -c "makepkg $MAKEPKGOPTS -f" aurbuild
+    su -c "makepkg $MAKEPKGOPTS $pkgtarget -f" aurbuild; buildcheck=$?
     su -c "removepgpkeys ${validpgpkeys[@]}" aurbuild
   else
     addpgpkeys "${validpgpkeys[@]}"
-    makepkg $MAKEPKGOPTS -f
+    makepkg $MAKEPKGOPTS $pkgtarget -f; buildcheck=$?
     removepgpkeys "${validpgpkeys[@]}"
   fi
 
   # Build check
-  if [[ $? -ne 0 ]]; then
+  if [[ $buildcheck -ne 0 ]]; then
     failure+=("$1")
     buildstatus 1
   else
@@ -638,19 +672,18 @@ aurinstall() {
     buildstatus 0
   fi
 
-  pkgtarfiles=""
-  for i in "${pkgname[@]}"; do
-    pkgtarfiles="$pkgtarfiles $i-*$PKGEXT"
-  done
+  #pkgtarfiles=""
+  #for i in "${pkgname[@]}"; do
+  #  pkgtarfiles="$pkgtarfiles $i-*$PKGEXT"
+  #done
 
   # Save packages
-  pkgtar=$(ls $pkgname-*$PKGEXT 2>/dev/null | tail -n 1)
+  pkgtar=$(ls $1-*$PKGEXT 2>/dev/null | tail -n 1)
   if [[ $pkgtar ]]; then
     [ -d $savedir ] || runasroot mkdir -p $savedir
-    runasroot cp $pkgname-*$PKGEXT $savedir/
-    echo -e "${COLOR5}  -> ${COLOR1}Saved package:${ENDCOLOR} $(ls $pkgname-*$PKGEXT)";
-    pkgfilename=$(ls $pkgname-*$PKGEXT)
-    buildinstall $pkgname $2 ${savedir}/$pkgfilename
+    runasroot cp ${pkgtar} $savedir/
+    echo -e "${COLOR5}  -> ${COLOR1}Saved package:${ENDCOLOR} ${pkgtar}";
+    buildinstall $1 $2 ${savedir}/$pkgtar
   fi
 }
 
@@ -843,13 +876,24 @@ run_quick_check() {
 }
 
 # proceed with installation prompt
+#proceed() {
+#  read -n 1
+#  echo
+#  case "$REPLY" in
+#    'Y'|'y'|'') return 0 ;;
+#    *)          return 1 ;;
+#  esac
+#}; 
+
 proceed() {
-  read -n 1
+  unset INPUT
+  read -n 1 INPUT
   echo
-  case "$REPLY" in
-    'Y'|'y'|'') return 0 ;;
-    *)          return 1 ;;
-  esac
+  if [[ "$INPUT" = [yY] ]]; then
+    return 0;
+  else
+    return 1;
+  fi
 }; export -f proceed
 
 # process busy loop
@@ -931,10 +975,10 @@ mkdir -p "$tmpdir"
 makearch=$(grep ^CARCH= "$makepkgconf" 2>/dev/null | grep -o -e =.*[0-9A-Za-z] | sed 's/^="//');
 
 # AUR4 compatibility
-if [[ $legacy != 1 ]]; then
-  RPCURL=$(echo "$RPCURL" | sed 's/\./4&/1')
-  PKGURL=$(echo "$PKGURL" | sed 's/\./4&/1')
-fi
+#if [[ $legacy != 1 ]]; then
+#  RPCURL=$(echo "$RPCURL" | sed 's/\./4&/1')
+#  PKGURL=$(echo "$PKGURL" | sed 's/\./4&/1')
+#fi
 
 # Check for new packages
 if [[ $quickcheck == 1 ]]; then
@@ -957,6 +1001,11 @@ fi
 
 # Install (-S) handling
 if [[ $option = install ]]; then
+  for pkg in ${packageargs[@]}; do
+    if [[ "$pkg" =~ ^/ ]]; then
+      err "${COLOR7}error:${ENDCOLOR} invalid package name $pkg"
+    fi
+  done
   installhandling "${packageargs[@]}"
   exit
 fi
