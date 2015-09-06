@@ -1,18 +1,20 @@
 #!/bin/bash
 ######################################################################
 # apacman - AUR wrapper forked from packer
-version="2.0"
+version="2.1"
 # Copyright OS Hazard <oshazard+aur@gmail.com>
 #
 # New Features:
+# * Signed package support (improved)
 # * Split package support
 # * AUR4 support
 # * Config file support
-# * Signed package support
 # * Built-in ABS support (WIP)
 # * Workaround for running as root
 # * Saves AUR packages to /var/cache/apacman/pkg
 # * Uses AUR package cache directory if applicable
+# * --keepkeys    do not remove imported PGP keys
+# * --purgekeys   remove imported PGP keys
 # * --legacy      backwards compatability for AUR3 (deprecated)
 # * --progress    transaction status in terminal titlebar
 # * --nosource    for security do not source PKGBUILDs (WIP)
@@ -131,7 +133,8 @@ usage() {
   echo '    --devel      - update VCS (git, svn, hg) packages during -Su'
   echo '    --ignore     - takes a comma-separated list of packages to ignore'
   echo '    --ignorearch - ignore a missing or incomplete architecture field'
-  echo '    --legacy     - uses AUR3.0 instead of AUR4.0'
+  echo '    --keepkeys   - do not remove imported PGP keys'
+  echo '    --legacy     - uses AUR3.0 instead of AUR4.0 (deprecated)'
   echo '    --needed     - do not install up-to-date packages'
   echo '    --noaur      - do not actions for AUR'
   echo '    --noconfirm  - do not prompt for any confirmation'
@@ -141,6 +144,7 @@ usage() {
   echo '    --preview    - edit pkgbuild before sourcing'
   echo '    --progress   - transaction status in terminal titlebar'
   echo '    --purgebuild - remove unneeded build dependencies'
+  echo '    --purgekeys  - remove trusted PGP keys'
   echo '    --quickcheck - check for updates and exit'
   echo '    --quiet      - only output package name for searches'
   echo '    --skipcache  - skips check for pre-built package in cache directory'
@@ -168,8 +172,8 @@ infoconf() {
     varstatus $i
   done
 
-  vars="auronly buildonly cachevcs ignorearch legacy needed noaur noconfirm noedit"
-  vars="$vars nofail preview progress purgebuild quiet skipcache skipinteg skiptest warn"
+  vars="auronly buildonly cachevcs ignorearch keepkeys legacy needed noaur noconfirm noedit"
+  vars="$vars nofail preview progress purgebuild purgekeys quiet skipcache skipinteg skiptest warn"
   for j in $vars; do
     varstatus $j
   done
@@ -244,7 +248,7 @@ sourceapacmanconf() {
   [[ $skiptest ]] && MAKEPKGOPTS+=("--nocheck")
   [[ $skipinteg ]] && MAKEPKGOPTS+=("--skipinteg")
   [[ $ignorearch ]] && MAKEPKGOPTS+=("--ignorearch")
-  export noconfirm COLOR1 COLOR2 COLOR3 COLOR4 COLOR5 COLOR6 COLOR7 ENDCOLOR
+  export keepkeys noconfirm COLOR1 COLOR2 COLOR3 COLOR4 COLOR5 COLOR6 COLOR7 ENDCOLOR
 }
 
 # Source makepkg.conf file
@@ -556,32 +560,43 @@ cacheinstall() {
 
 # Retrieve PGP keys ($@ is ${validpgpkeys[@]})
 export gpgconf
-addpgpkeys() {
+checkpgpkeys() {
   if [[ $1 ]]; then
-    keyexists=$(gpg --fingerprint $@ 2>/dev/null)
-    if ! [[ $keyexists ]]; then
-      echo -e "\n${COLOR6}warning:${ENDCOLOR} One or more PGP signatures unknown"
-      for pgpkey in $@; do
-        echo -e "\t${COLOR7}${pgpkey}${ENDCOLOR}"
-      done
-      echo -en "${COLOR5}:: ${COLOR1}Verify PGP keys? [Y/n]${ENDCOLOR} "
-      if ! [[ $noconfirm ]]; then
-        proceed || exit
-      else
-        echo
-      fi
-      [ -f $HOME/.gnupg/gpg.conf ] || cp $gpgconf $HOME/.gnupg/
-      gpg --recv-key $@
-      echo
-    fi
+    gpg --fingerprint $@ 2>/dev/null
   fi
+}; export -f checkpgpkeys
+
+# Prompt to import PGP keys ($@ is ${validpgpkeys[@]})
+askpgpkeys() {
+  echo -e "\n${COLOR6}warning:${ENDCOLOR} One or more PGP signatures unknown"
+  for pgpkey in $@; do
+    echo -e "\t${COLOR7}${pgpkey}${ENDCOLOR}"
+  done
+  echo -en "${COLOR5}:: ${COLOR1}Verify PGP keys? [Y/n]${ENDCOLOR} "
+  if ! [[ $noconfirm ]]; then
+    proceed || exit
+  else
+    echo
+  fi
+}; export -f askpgpkeys
+
+# Import PGP keys ($@ is ${validpgpkeys[@]})
+addpgpkeys() {
+  [ -f $HOME/.gnupg/gpg.conf ] || cp $gpgconf $HOME/.gnupg/
+  for pgpkey in $@; do
+    echo -e "${COLOR6}trusting:${ENDCOLOR} ${COLOR7}${pgpkey}${ENDCOLOR}"
+    gpg --recv-key $pgpkey
+  done
 }; export -f addpgpkeys
 
 # Remove added PGP keys ($@ is ${validpgpkeys[@]})
 removepgpkeys() {
-  keycheck=$(gpg --fingerprint $@ 2>/dev/null)
-  if [[ $keycheck ]]; then
+  if ! [[ $keepkeys ]]; then
+    keycheck=$(gpg --fingerprint $@ 2>/dev/null)
+    if [[ $keycheck ]]; then
+      echo -e "${COLOR5}  -> ${COLOR1}Removed $# trusted keys${ENDCOLOR}"
       gpg --batch --yes --delete-keys $@
+    fi
   fi
 }; export -f removepgpkeys
 
@@ -653,14 +668,34 @@ aurinstall() {
     id aurbuild >/dev/null 2>/dev/null || useradd -r -d /var/empty aurbuild
     mkdir -p /var/empty/.gnupg
     chown -R aurbuild:aurbuild . /var/empty/.gnupg
-    su -c "gpg --refresh-keys" aurbuild
-    su -c "addpgpkeys ${validpgpkeys[@]}" aurbuild
-    su -c "makepkg $MAKEPKGOPTS $pkgtarget -f" aurbuild; buildcheck=$?
-    su -c "removepgpkeys ${validpgpkeys[@]}" aurbuild
+
+    if [[ $validpgpkeys ]]; then
+      su aurbuild -c "gpg --refresh-keys ${validpgpkeys[*]}"
+      keyfound=$(su aurbuild -c "checkpgpkeys ${validpgpkeys[*]}" 2>/dev/null)
+      if ! [[ $keyfound ]]; then
+        askpgpkeys "${validpgpkeys[*]}"
+        su aurbuild -c "addpgpkeys ${validpgpkeys[*]}"
+      fi
+      su aurbuild -c "makepkg $MAKEPKGOPTS $pkgtarget -f"; buildcheck=$?
+      [[ $keyfound ]] || su aurbuild -c "removepgpkeys ${validpgpkeys[*]}"
+      [[ $purgekeys ]] && [[ $keyfound ]] && su aurbuild -c "removepgpkeys ${validpgpkeys[*]}"
+    else
+      su aurbuild -c "makepkg $MAKEPKGOPTS $pkgtarget -f"; buildcheck=$?
+    fi
   else
-    addpgpkeys "${validpgpkeys[@]}"
-    makepkg $MAKEPKGOPTS $pkgtarget -f; buildcheck=$?
-    removepgpkeys "${validpgpkeys[@]}"
+    if [[ $validpgpkeys ]]; then
+      gpg --refresh-keys "${validpgpkeys[@]}"
+      keyfound=$(checkpgpkeys "${validpgpkeys[@]}" 2>/dev/null)
+      if ! [[ $keyfound ]]; then
+        askpgpkeys "${validpgpkeys[@]}"
+        addpgpkeys "${validpgpkeys[@]}"
+      fi
+      makepkg $MAKEPKGOPTS $pkgtarget -f; buildcheck=$?
+      [[ $keyfound ]] || removepgpkeys "${validpgpkeys[@]}"
+      [[ $purgekeys ]] && [[ $keyfound ]] && removepgpkeys "${validpgpkeys[@]}"
+    else
+      makepkg $MAKEPKGOPTS $pkgtarget -f; buildcheck=$?
+    fi
   fi
 
   # Build check
@@ -672,16 +707,11 @@ aurinstall() {
     buildstatus 0
   fi
 
-  #pkgtarfiles=""
-  #for i in "${pkgname[@]}"; do
-  #  pkgtarfiles="$pkgtarfiles $i-*$PKGEXT"
-  #done
-
   # Save packages
   pkgtar=$(ls $1-*$PKGEXT 2>/dev/null | tail -n 1)
   if [[ $pkgtar ]]; then
     [ -d $savedir ] || runasroot mkdir -p $savedir
-    runasroot cp ${pkgtar} $savedir/
+    runasroot cp ${pkgtar} $savedir/ &&
     echo -e "${COLOR5}  -> ${COLOR1}Saved package:${ENDCOLOR} ${pkgtar}";
     buildinstall $1 $2 ${savedir}/$pkgtar
   fi
@@ -876,24 +906,13 @@ run_quick_check() {
 }
 
 # proceed with installation prompt
-#proceed() {
-#  read -n 1
-#  echo
-#  case "$REPLY" in
-#    'Y'|'y'|'') return 0 ;;
-#    *)          return 1 ;;
-#  esac
-#}; 
-
 proceed() {
-  unset INPUT
-  read -n 1 INPUT
+  read -n 1
   echo
-  if [[ "$INPUT" = [yY] ]]; then
-    return 0;
-  else
-    return 1;
-  fi
+  case "$REPLY" in
+    'Y'|'y'|'') return 0 ;;
+    *)          return 1 ;;
+  esac
 }; export -f proceed
 
 # process busy loop
@@ -932,6 +951,7 @@ while [[ $1 ]]; do
     '--devel') devel='1' ;;
     '--ignore') ignorearg="$2" ; PACOPTS+=("--ignore" "$2") ; shift ;;
     '--ignorearch') MAKEPKGOPTS+=("--ignorearch");;
+    '--keepkeys') keepkeys='1' ; export keepkeys ;;
     '--legacy') legacy='1' ;;
     '--needed') needed='1' PACOPTS+=("--needed");;
     '--noaur') noaur='1' ; unset auronly ;;
@@ -942,6 +962,7 @@ while [[ $1 ]]; do
     '--preview') preview='1' ;;
     '--progress') progress='1' ;;
     '--purgebuild') purgebuild='1' ;;
+    '--purgekeys') purgekeys='1' ;;
     '--quickcheck') quickcheck='1' ;;
     '--quiet') quiet='1' ;;
     '--skipcache') skipcache='1' ;;
@@ -1141,7 +1162,7 @@ if [[ $option = search || $option = searchinstall ]]; then
       results="$($pacmanbin -Ss -- "${packageargs[@]}")"
       results="$(sed -r "s|^[^ ][^/]*/|$S${COLOR3}&$S${COLOR1}|" <<< "$results")"
       results="$(sed -r "s|^([^ ]+) ([^ ]+)(.*)$|\1 $S${COLOR2}\2$S${ENDCOLOR}\3|" <<< "$results")"
-      results="$(sed -e "s| \[|\\${COLOR4}&|" -e "s|\]|&\\${ENDCOLOR}|" <<< "$results")"
+      results="$(sed -e "s| \[|$S${COLOR4}&|" -e "s|\]|&$S${ENDCOLOR}|" <<< "$results")"
     fi
     if [[ $option = search ]]; then
       echo -e "$results" | fmt -"$_WIDTH" -s
@@ -1200,7 +1221,7 @@ if [[ $option = search || $option = searchinstall ]]; then
       printf "%s\n" ${aurname[@]}
     elif [[ -s "$tmpdir/search.results" ]]; then
       resultsaur="$(printf "${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(cat "$tmpdir/search.results"))"
-      resultsaur="$(sed -e "s| \[|\\${COLOR4}&|" -e "s|\] |&\\${ENDCOLOR}|" <<< "$resultsaur")"
+      resultsaur="$(sed -e "s| \[|$S${COLOR4}&|" -e "s|\]|&$S${ENDCOLOR}|" <<< "$resultsaur")"
       echo -e "$resultsaur"
     fi
   else
@@ -1209,7 +1230,7 @@ if [[ $option = search || $option = searchinstall ]]; then
       nl -v ${pactotal:-0} -w 1 -s ' ' <(cut -f 1 "$tmpdir/search.results")
     elif [[ -s "$tmpdir/search.results" ]]; then
       resultsaur="$(printf "%d ${COLOR3}aur/${COLOR1}%s ${COLOR2}%s${ENDCOLOR} (%s)\n    %s\n" $(nl -v ${pactotal:-0} -w 1 < "$tmpdir/search.results"))"
-      resultsaur="$(sed -e "s| \[|\\${COLOR4}&|" -e "s|\] |&\\${ENDCOLOR}|" <<< "$resultsaur")"
+      resultsaur="$(sed -e "s| \[|$S${COLOR4}&|" -e "s|\] |&$S${ENDCOLOR}|" <<< "$resultsaur")"
       echo -e "$resultsaur"
     fi
   fi | fmt -"$_WIDTH" -s

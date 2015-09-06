@@ -2,12 +2,12 @@
 .\"     Title: apacman.conf
 .\"    Author: [see the "Authors" section]
 .\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
-.\"      Date: 07/08/2015
+.\"      Date: 09/05/2015
 .\"    Manual: apacman Manual
 .\"    Source: apacman
 .\"  Language: English
 .\"
-.TH "APACMAN\&.CONF" "5" "07/08/2015" "apacman" "apacman Manual"
+.TH "APACMAN\&.CONF" "5" "09/05/2015" "apacman" "apacman Manual"
 .\" -----------------------------------------------------------------
 .\" * set default formatting
 .\" -----------------------------------------------------------------
@@ -83,9 +83,14 @@ Installs cached VCS packages if newer than AUR PKGBUILD versions\&.
 Ignore missing architecture in PKGBUILD (mostly for ARM systems)\&.
 .RE
 .PP
+\fBkeepkeys =\fR 1
+.RS 4
+Do not remove imported PGP keys\&.
+.RE
+.PP
 \fBlegacy =\fR 1
 .RS 4
-Use AUR3 repo rather than AUR4\&.
+Use AUR3 repo rather than AUR4 (deprecated)\&.
 .RE
 .PP
 \fBneeded =\fR 1

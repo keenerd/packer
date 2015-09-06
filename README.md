@@ -6,6 +6,11 @@ ArchLinux User Repository (AUR) helper and pacman wrapper forked from packer
 [Migrate wizard for AUR4](https://gist.github.com/oshazard/370c7ed631af2181ee51)
 
 Features:
+* **NEW** improved signed package support
+* **NEW** --keepkeys parameter stores PGP keys
+* **NEW** --purgekeys parameter removes trusted PGP keys
+* **NEW** fix for piping output
+* **NEW** fix for yes/no dialog
 * Split package support and shared source
 * Improved AUR4 support
 * Bug fix for AUR4 -Si
