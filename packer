@@ -494,6 +494,70 @@ run_quick_check() {
   pacman -Qqu --dbpath "$CHECKUPDATE_DB" 2> /dev/null 
 }
 
+refreshpackagedatabases() {
+  # Pacman update
+  if ! [[ $auronly ]]; then
+    runasroot $PACMAN "${PACOPTS[@]}" "$pacmanarg"
+  fi
+
+  # Aur update
+  echo -e "${COLOR5}:: ${COLOR1}Synchronizing aur database...${ENDCOLOR}"
+  IFS=$'\n' read -rd '' -a packages < <(pacman -Qm)
+  newpackages=()
+  checkignores=()
+  total="${#packages[@]}"
+  grep -q '^ *ILoveCandy' "$pacmanconf" && bartype='candy' || bartype='normal'
+
+  if [[ $devel ]]; then
+    for ((i=0; i<$total; i++)); do
+      aurbar "$((i+1))" "$total" "$bartype"
+      pkg="${packages[i]%% *}"
+      if isignored "$pkg"; then
+        checkignores+=("${packages[i]}")
+        continue
+      fi
+      pkginfo "$pkg" &
+      nap
+    done
+    wait
+    for ((i=0; i<$total; i++)); do
+      pkg="${packages[i]%% *}"
+      ver="${packages[i]##* }"
+      if [[ ! -s "$tmpdir/$pkg.PKGBUILD" ]]; then
+        continue
+      fi
+      if isignored "$pkg"; then
+        continue
+      fi
+      unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
+      . "$tmpdir/$pkg.PKGBUILD"
+      if [[ "$(LC_ALL=C vercmp "$pkgver-$pkgrel" "$ver")" -gt 0 ]]; then
+        newpackages+=("$pkg")
+      elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then
+        newpackages+=("$pkg")
+      fi
+    done
+  else
+    for ((i=0; i<$total; i++)); do
+      aurbar "$((i+1))" "$total" "$bartype"
+      pkg="${packages[i]%% *}"
+      rpcinfo "$pkg" &
+      nap
+    done
+    wait
+    for ((i=0; i<$total; i++)); do
+      pkg="${packages[i]%% *}"
+      ver="${packages[i]##* }"
+      if isignored "$pkg"; then
+        checkignores+=("${packages[i]}")
+      elif aurversionisnewer "$pkg" "$ver"; then
+        newpackages+=("$pkg")
+    fi
+    done
+  fi
+  echo
+}
+
 # proceed with installation prompt
 proceed() {
   read -n 1
@@ -518,6 +582,7 @@ while [[ $1 ]]; do
   case "$1" in
     '-S') option=install ;;
     '-Ss') option=search ;;
+    '-Sy') option=refresh ; pacmanarg="$1" ;;
     '-Ssq'|'-Sqs') option=search ; quiet='1' ;;
     '-Si') option=info ;;
     -S*u*) option=update ; pacmanarg="$1" ;;
@@ -547,7 +612,7 @@ fi
 
 # Sanity checks
 [[ $option ]] || option="searchinstall"
-[[ $option != "update" && -z $packageargs ]] && err "Must specify a package."
+[[ $option != "update" && $option != "refresh" && -z $packageargs ]] && err "Must specify a package."
 
 # Install (-S) handling
 if [[ $option = install ]]; then
@@ -559,67 +624,9 @@ fi
 if [[ $option = update ]]; then
   getignoredpackages
   sourcemakepkgconf
-  # Pacman update
-  if ! [[ $auronly ]]; then
-    runasroot $PACMAN "${PACOPTS[@]}" "$pacmanarg"
-  fi
 
-  # Aur update
-  echo -e "${COLOR5}:: ${COLOR1}Synchronizing aur database...${ENDCOLOR}"
-  IFS=$'\n' read -rd '' -a packages < <(pacman -Qm)
-  newpackages=()
-  checkignores=()
-  total="${#packages[@]}"
-  grep -q '^ *ILoveCandy' "$pacmanconf" && bartype='candy' || bartype='normal'
-
-  if [[ $devel ]]; then
-    for ((i=0; i<$total; i++)); do 
-      aurbar "$((i+1))" "$total" "$bartype"
-      pkg="${packages[i]%% *}"
-      if isignored "$pkg"; then
-        checkignores+=("${packages[i]}")
-        continue
-      fi
-      pkginfo "$pkg" &
-      nap
-    done
-    wait
-    for ((i=0; i<$total; i++)); do 
-      pkg="${packages[i]%% *}"
-      ver="${packages[i]##* }"
-      if [[ ! -s "$tmpdir/$pkg.PKGBUILD" ]]; then
-        continue
-      fi
-      if isignored "$pkg"; then
-        continue
-      fi
-      unset _darcstrunk _cvsroot _gitroot _svntrunk _bzrtrunk _hgroot
-      . "$tmpdir/$pkg.PKGBUILD"
-      if [[ "$(LC_ALL=C vercmp "$pkgver-$pkgrel" "$ver")" -gt 0 ]]; then
-        newpackages+=("$pkg")
-      elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
-        newpackages+=("$pkg")
-      fi
-    done
-  else
-    for ((i=0; i<$total; i++)); do 
-      aurbar "$((i+1))" "$total" "$bartype"
-      pkg="${packages[i]%% *}"
-      rpcinfo "$pkg" &
-      nap
-    done
-    wait
-    for ((i=0; i<$total; i++)); do
-      pkg="${packages[i]%% *}"
-      ver="${packages[i]##* }"
-      if isignored "$pkg"; then
-        checkignores+=("${packages[i]}")
-      elif aurversionisnewer "$pkg" "$ver"; then
-        newpackages+=("$pkg")
-    fi
-    done
-  fi
-  echo
+  # Refresh Pacman & AUR
+  refreshpackagedatabases
 
   echo -e "${COLOR5}:: ${COLOR1}Starting full aur upgrade...${ENDCOLOR}"
 
@@ -747,6 +754,15 @@ if [[ $option = search || $option = searchinstall ]]; then
   rm -f "$tmpdir/*search" &>/dev/null
   rm -f "$tmpdir/search.result" &>/dev/null
   exit
+fi
+
+# Refresh (-Sy) handling
+if [[ $option = refresh ]]; then
+  getignoredpackages
+  sourcemakepkgconf
+
+  # Refresh Pacman & AUR
+  refreshpackagedatabases
 fi
 
 # Info (-Si) handling
