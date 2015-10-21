@@ -56,6 +56,7 @@ usage() {
   echo 'usage: packer [option] [package] [package] [...]'
   echo
   echo '    -S           - installs package'
+  echo '    -Sy          - refresh the package database'
   echo '    -Syu|-Su     - updates all packages, also takes -uu and -yy options'
   echo '    -Ss|-Ssq     - searches for package'
   echo '    -Si          - outputs info for package'
