@@ -24,7 +24,7 @@ makepkgconf='/etc/makepkg.conf'
 usermakepkgconf="$HOME/.makepkg.conf"
 pacmanconf='/etc/pacman.conf'
 
-RPCURL="https://aur.archlinux.org/rpc.php?type"
+RPCURL="https://aur.archlinux.org/rpc.php/rpc/?v=5&type"
 PKGURL="https://aur.archlinux.org"
 PKGBURL="https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h"
 
@@ -469,7 +469,7 @@ installhandling() {
 }
 
 run_quick_check() {
-  bigurl="https://aur.archlinux.org/rpc.php?type=multiinfo"
+  bigurl="https://aur.archlinux.org/rpc.php/rpc/?v=5&type=info"
   for p in $(pacman -Qqm); do
     bigurl="$bigurl&arg\[\]=$p"
   done
