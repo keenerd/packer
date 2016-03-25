@@ -24,7 +24,7 @@ makepkgconf='/etc/makepkg.conf'
 usermakepkgconf="$HOME/.makepkg.conf"
 pacmanconf='/etc/pacman.conf'
 
-RPCURL="https://aur.archlinux.org/rpc.php?type"
+RPCURL="https://aur.archlinux.org/rpc.php/rpc/?v=5&type"
 PKGURL="https://aur.archlinux.org"
 PKGBURL="https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h"
 
@@ -236,7 +236,7 @@ rpcinfo() {
 
 pkglink() {
   rpcinfo $1
-  echo "${PKGURL}$(jshon -Q -e results -e URLPath -u < "$tmpdir/$1.info")"
+  echo "${PKGURL}$(jshon -Q -e results -a -e URLPath -u < "$tmpdir/$1.info")"
 }
 
 # downloads pkgbuild ($1), edits if $2 is set
@@ -257,7 +257,7 @@ aurversionisnewer() {
   rpcinfo "$1"
   unset aurversion
   if existsinaur "$1"; then
-    aurversion="$(jshon -Q -e results -e Version -u < "$tmpdir/$1.info")"
+    aurversion="$(jshon -Q -e results -a -e Version -u < "$tmpdir/$1.info")"
     if [[ "$(LC_ALL=C vercmp "$aurversion" "$2")" -gt 0  ]]; then
       return 0
     fi
@@ -267,7 +267,7 @@ aurversionisnewer() {
 
 isoutofdate() {
   rpcinfo "$1"
-  [[ "$(jshon -Q -e results -e OutOfDate -u < "$tmpdir/$1.info")" = "1" ]]
+  [[ "$(jshon -Q -e results -a -e OutOfDate -u < "$tmpdir/$1.info")" = "1" ]]
 }
 
 # $1 is prompt, $2 is file
@@ -469,7 +469,7 @@ installhandling() {
 }
 
 run_quick_check() {
-  bigurl="https://aur.archlinux.org/rpc.php?type=multiinfo"
+  bigurl="https://aur.archlinux.org/rpc.php/rpc/?v=5&type=info"
   for p in $(pacman -Qqm); do
     bigurl="$bigurl&arg\[\]=$p"
   done
