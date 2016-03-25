@@ -36,7 +36,7 @@ if [[ -t 1 && ! $COLOR = "NO" ]]; then
   COLOR5='\e[1;34m'
   COLOR6='\e[1;33m'
   COLOR7='\e[1;31m'
-  ENDCOLOR='\e[0m' 
+  ENDCOLOR='\e[0m'
   S='\\'
 fi
 _WIDTH="$(stty size | cut -d ' ' -f 2)"
@@ -66,6 +66,7 @@ usage() {
   echo '    --noconfirm  - do not prompt for any confirmation'
   echo '    --noedit     - do not prompt to edit files'
   echo '    --quickcheck - check for updates and exit'
+  echo '    --asdeps     - install package as dependency'
   echo '    --auronly    - only do actions for aur'
   echo '    --devel      - update devel packages during -Su'
   echo '    --skipinteg  - when using makepkg, do not check md5s'
@@ -186,7 +187,7 @@ finddeps() {
 aurbar() {
   # Delete line
   printf "\033[0G"
-  
+
   # Get vars for output
   beginline=" aur"
   beginbar="["
@@ -197,7 +198,7 @@ aurbar() {
   charsbefore="$((${#beginline}+${#1}+${#2}+${#beginbar}+3))"
   spaces="$((51-$charsbefore))"
   barchars="$(($width-51-7))"
-  hashes="$(($barchars*$perc/100))" 
+  hashes="$(($barchars*$perc/100))"
   dashes="$(($barchars-$hashes))"
 
   # Print output
@@ -398,10 +399,14 @@ installhandling() {
       fi
     fi
   done
- 
+
   # First install the explicit pacman packages, let pacman prompt
   if [[ $pacmanpackages ]]; then
-    runasroot $PACMAN "${PACOPTS[@]}" -S -- "${pacmanpackages[@]}"
+    if ! [[ $asdeps ]]; then
+      runasroot $PACMAN "${PACOPTS[@]}" -S -- "${pacmanpackages[@]}"
+    else
+      runasroot $PACMAN "${PACOPTS[@]}" -S --asdeps -- "${pacmanpackages[@]}"
+    fi
   fi
   if [[ -z $aurtargets ]]; then
     exit
@@ -422,13 +427,13 @@ installhandling() {
       echo -e "${COLOR6}warning:$ENDCOLOR $pkg is flagged out of date"
     fi
   done
-    
+
   # Prompt for aur packages and their dependencies
   echo
   if [[ $aurdepends ]]; then
     num="$((${#aurdepends[@]}+${#aurtargets[@]}))"
     echo -e "${COLOR6}Aur Targets    ($num):${ENDCOLOR} ${aurdepends[@]} ${aurtargets[@]}"
-  else 
+  else
     echo -e "${COLOR6}Aur Targets    ($((${#aurtargets[@]}))):${ENDCOLOR} ${aurtargets[@]}"
   fi
   if [[ $pacmandepends ]]; then
@@ -448,20 +453,24 @@ installhandling() {
   # Install pacman dependencies
   if [[ $pacmandepends ]]; then
     runasroot $PACMAN --noconfirm --asdeps -S -- "${pacmandepends[@]}" || err "Installation failed."
-  fi 
+  fi
 
   # Install aur dependencies
   if [[ $aurdepends ]]; then
     for dep in "${aurdepends[@]}"; do
       aurinstall "$dep" "dependency"
     done
-  fi 
+  fi
 
   # Install the aur packages
   for package in "${aurtargets[@]}"; do
     scrapeaurdeps "$package"
     if pacman -T "${dependencies[@]}" &>/dev/null; then
-      aurinstall "$package" "explicit"
+      if ! [[ $asdeps ]]; then
+        aurinstall "$package" "explicit"
+      else
+        aurinstall "$package" "dependency"
+      fi
     else
       echo "Dependencies for \`$package' are not met, not building..."
     fi
@@ -491,7 +500,7 @@ run_quick_check() {
   mkdir -p "$CHECKUPDATE_DB"
   ln -s "${DBPath}/local" "$CHECKUPDATE_DB" &> /dev/null
   fakeroot pacman -Sqy --dbpath "$CHECKUPDATE_DB" &> /dev/null
-  pacman -Qqu --dbpath "$CHECKUPDATE_DB" 2> /dev/null 
+  pacman -Qqu --dbpath "$CHECKUPDATE_DB" 2> /dev/null
 }
 
 # proceed with installation prompt
@@ -527,6 +536,7 @@ while [[ $1 ]]; do
     '--ignore') ignorearg="$2" ; PACOPTS+=("--ignore" "$2") ; shift ;;
     '--noconfirm') noconfirm='1' PACOPTS+=("--noconfirm");;
     '--noedit') noedit='1' ;;
+    '--asdeps') asdeps='1' ;;
     '--auronly') auronly='1' ;;
     '--quickcheck') quickcheck='1' ;;
     '--devel') devel='1' ;;
@@ -573,7 +583,7 @@ if [[ $option = update ]]; then
   grep -q '^ *ILoveCandy' "$pacmanconf" && bartype='candy' || bartype='normal'
 
   if [[ $devel ]]; then
-    for ((i=0; i<$total; i++)); do 
+    for ((i=0; i<$total; i++)); do
       aurbar "$((i+1))" "$total" "$bartype"
       pkg="${packages[i]%% *}"
       if isignored "$pkg"; then
@@ -584,7 +594,7 @@ if [[ $option = update ]]; then
       nap
     done
     wait
-    for ((i=0; i<$total; i++)); do 
+    for ((i=0; i<$total; i++)); do
       pkg="${packages[i]%% *}"
       ver="${packages[i]##* }"
       if [[ ! -s "$tmpdir/$pkg.PKGBUILD" ]]; then
@@ -597,12 +607,12 @@ if [[ $option = update ]]; then
       . "$tmpdir/$pkg.PKGBUILD"
       if [[ "$(LC_ALL=C vercmp "$pkgver-$pkgrel" "$ver")" -gt 0 ]]; then
         newpackages+=("$pkg")
-      elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then 
+      elif [[ ${_darcstrunk} || ${_cvsroot} || ${_gitroot} || ${_svntrunk} || ${_bzrtrunk} || ${_hgroot} ]]; then
         newpackages+=("$pkg")
       fi
     done
   else
-    for ((i=0; i<$total; i++)); do 
+    for ((i=0; i<$total; i++)); do
       aurbar "$((i+1))" "$total" "$bartype"
       pkg="${packages[i]%% *}"
       rpcinfo "$pkg" &
@@ -657,7 +667,7 @@ fi
 
 # Search (-Ss) handling
 if [[ $option = search || $option = searchinstall ]]; then
-  # Pacman searching 
+  # Pacman searching
   if ! [[ $auronly ]]; then
     if [[ $quiet ]]; then
       results="$(pacman -Ssq -- "${packageargs[@]}")"
@@ -727,7 +737,7 @@ if [[ $option = search || $option = searchinstall ]]; then
     echo -e "${COLOR2}Type numbers to install. Separate each number with a space.${ENDCOLOR}"
     echo -ne "${COLOR2}Numbers: ${ENDCOLOR}"
     read -r
-    
+
     # Parse answer
     if [[ $REPLY ]]; then
       for num in $REPLY; do
@@ -739,7 +749,7 @@ if [[ $option = search || $option = searchinstall ]]; then
       done
     fi
 
-    # Call installhandling to take care of the packages chosen 
+    # Call installhandling to take care of the packages chosen
     installhandling "${pkglist[@]}"
   fi
 
@@ -789,7 +799,7 @@ if [[ $option = info ]]; then
           if [[ $i = 0 ]]; then
             echo "${optdepends[$i]}"
           else
-            echo -e "                 ${optdepends[$i]}" 
+            echo -e "                 ${optdepends[$i]}"
           fi
         done
       fi
