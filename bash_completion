@@ -1,0 +1,7 @@
+_packer() {
+	COMPREPLY=()
+	options=$(packer -h | grep '-' | cut -c 5- | sed 's/ .*//g' | sed 's/|/\n/g' | tr '\n' ' ')
+	COMPREPLY=( $(IFS=" "; compgen -W "$options" -- "${COMP_WORDS[$COMP_CWORD]}") )
+}
+
+complete -o nospace -F _packer packer
