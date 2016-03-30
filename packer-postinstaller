@@ -1,5 +1,7 @@
 #!/bin/bash
-# Copyright Matthew Bruenig <matthewbruenig@gmail.com>
+# A fork of packer https://github.com/keenerd/packer for PostInstallerF
+# http://sourceforge.net/projects/postinstaller/
+# Contact: https://plus.google.com/u/0/communities/118230919321773121406
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -24,9 +26,8 @@ makepkgconf='/etc/makepkg.conf'
 usermakepkgconf="$HOME/.makepkg.conf"
 pacmanconf='/etc/pacman.conf'
 
-RPCURL="https://aur.archlinux.org/rpc.php/rpc/?v=5&type"
+RPCURL="https://aur.archlinux.org/rpc.php?type"
 PKGURL="https://aur.archlinux.org"
-PKGBURL="https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h"
 
 if [[ -t 1 && ! $COLOR = "NO" ]]; then
   COLOR1='\e[1;39m'
@@ -57,9 +58,7 @@ usage() {
   echo
   echo '    -S           - installs package'
   echo '    -L           - install locally package, requires specific path'
-  echo '    -Lc          - install locally package, with graphical autentication, requires specific path'
   echo '    -D           - uninstall package'
-  echo '    -Dc          - uninstall package with graphical autentication'
   echo '    -Syu|-Su     - updates all packages, also takes -uu and -yy options'
   echo '    -Ss|-Ssq     - searches for package'
   echo '    -Si          - outputs info for package'
@@ -82,18 +81,6 @@ usage() {
 runasroot() {
   if [[ $UID -eq 0 ]]; then
     "$@"
-  elif sudo -v &>/dev/null && sudo -l "$@" &>/dev/null; then
-    sudo -E "$@"
-  else
-    echo -n "root "
-    su -c "$(printf '%q ' "$@")"
-  fi
-}
-
-
-runasrootgui() {
-  if [[ $UID -eq 0 ]]; then
-    "$@"
   elif zenity --password | sudo -S -v &>/dev/null && sudo -l "$@" &>/dev/null; then
     sudo -E "$@"
   else
@@ -101,7 +88,6 @@ runasrootgui() {
     zenity --password | su -c "$(printf '%q ' "$@")"
   fi
 }
-
 
 # Source makepkg.conf file
 sourcemakepkgconf() {
@@ -253,13 +239,14 @@ rpcinfo() {
 
 pkglink() {
   rpcinfo $1
-  echo "${PKGURL}$(jshon -Q -e results -a -e URLPath -u < "$tmpdir/$1.info")"
+  echo "${PKGURL}$(jshon -Q -e results -e URLPath -u < "$tmpdir/$1.info")"
 }
 
 # downloads pkgbuild ($1), edits if $2 is set
 pkginfo() {
   if ! [[ -f "$tmpdir/$1.PKGBUILD" ]]; then
-    curl -Lfs "${PKGBURL}=${1}" > "$tmpdir/$1.PKGBUILD"
+    pkgpath=$(pkglink $1)
+    curl -Lfs "${pkgpath%/*}/PKGBUILD" > "$tmpdir/$1.PKGBUILD"
     if [[ $2 ]]; then
       # rename for syntax highlighting
       cp "$tmpdir/$1.PKGBUILD" "$tmpdir/PKGBUILD"
@@ -274,7 +261,7 @@ aurversionisnewer() {
   rpcinfo "$1"
   unset aurversion
   if existsinaur "$1"; then
-    aurversion="$(jshon -Q -e results -a -e Version -u < "$tmpdir/$1.info")"
+    aurversion="$(jshon -Q -e results -e Version -u < "$tmpdir/$1.info")"
     if [[ "$(LC_ALL=C vercmp "$aurversion" "$2")" -gt 0  ]]; then
       return 0
     fi
@@ -284,7 +271,7 @@ aurversionisnewer() {
 
 isoutofdate() {
   rpcinfo "$1"
-  [[ "$(jshon -Q -e results -a -e OutOfDate -u < "$tmpdir/$1.info")" = "1" ]]
+  [[ "$(jshon -Q -e results -e OutOfDate -u < "$tmpdir/$1.info")" = "1" ]]
 }
 
 # $1 is prompt, $2 is file
@@ -344,7 +331,6 @@ aurinstall() {
   confirm_edit "${COLOR6}Edit $install with \$EDITOR? [Y/n]${ENDCOLOR} " "$install"
 
   # Installation (makepkg and pacman)
-  rm -f *$PKGEXT
   if [[ $UID -eq 0 ]]; then
     makepkg $MAKEPKGOPTS --asroot -f
   else
@@ -352,14 +338,10 @@ aurinstall() {
   fi
 
   [[ $? -ne 0 ]] && echo "The build failed." && return 1
-  pkgtarfiles=""
-  for i in "${pkgname[@]}"; do
-    pkgtarfiles="$pkgtarfiles $i-*$PKGEXT"
-  done
   if  [[ $2 = dependency ]]; then
-    runasroot $PACMAN ${PACOPTS[@]} --asdeps -U $pkgtarfiles
+    runasroot $PACMAN ${PACOPTS[@]} --asdeps -U $pkgname-*$PKGEXT
   elif [[ $2 = explicit ]]; then
-    runasroot $PACMAN ${PACOPTS[@]} -U $pkgtarfiles
+    runasroot $PACMAN ${PACOPTS[@]} -U $pkgname-*$PKGEXT
   fi
 }
 
@@ -486,7 +468,7 @@ installhandling() {
 }
 
 run_quick_check() {
-  bigurl="https://aur.archlinux.org/rpc.php/rpc/?v=5&type=info"
+  bigurl="https://aur.archlinux.org/rpc.php?type=multiinfo"
   for p in $(pacman -Qqm); do
     bigurl="$bigurl&arg\[\]=$p"
   done
@@ -535,9 +517,7 @@ while [[ $1 ]]; do
   case "$1" in
     '-S') option=install ;;
     '-L') option=localinstall ;;
-    '-Lc') option=localinstall-gui ;;
     '-D') option=remove ;;
-    '-Dc') option=remove-gui ;;
     '-Ss') option=search ;;
     '-Ssq'|'-Sqs') option=search ; quiet='1' ;;
     '-Si') option=info ;;
@@ -578,29 +558,16 @@ fi
 
 # Install (-L) local
 if [[ $option = localinstall ]]; then
-  runasroot $PACMAN -U "${packageargs[@]}"
-  exit
-fi
-
-# Install (-Lc) local with graphical autentication
-if [[ $option = localinstall-gui ]]; then
-  runasrootgui $PACMAN -U --noconfirm "${packageargs[@]}"
+  runasroot $PACMAN -U --noconfirm "${packageargs[@]}"
   exit
 fi
 
 # Remove (-D) 
 if [[ $option = remove ]]; then
-  runasroot $PACMAN -Rs "${PACOPTS[@]}" "${packageargs[@]}"
-  exit
-fi
-
-# Remove (-Dc) with graphical autentication
-if [[ $option = remove-gui ]]; then
 #  zenity --password | sudo -S pacman -R --noconfirm "${packageargs[@]}"
-  runasrootgui $PACMAN -Rs --noconfirm "${packageargs[@]}"
-  exit
+  runasroot $PACMAN -Rs --noconfirm "${packageargs[@]}"
+exit
 fi
-
 
 # Update (-Su) handling
 if [[ $option = update ]]; then
