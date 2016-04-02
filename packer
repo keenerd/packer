@@ -44,7 +44,7 @@ _WIDTH="$(stty size | cut -d ' ' -f 2)"
 trap ctrlc INT
 ctrlc() {
   echo
-  exit
+  exit 1
 }
 
 err() {
