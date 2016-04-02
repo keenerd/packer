@@ -549,12 +549,6 @@ fi
 [[ $option ]] || option="searchinstall"
 [[ $option != "update" && -z $packageargs ]] && err "Must specify a package."
 
-# Install (-S) handling
-if [[ $option = install ]]; then
-  installhandling "${packageargs[@]}"
-  exit
-fi
-
 # Update (-Su) handling
 if [[ $option = update ]]; then
   getignoredpackages
@@ -636,6 +630,12 @@ if [[ $option = update ]]; then
     installhandling "${newpackages[@]}"
   fi
   echo " local database is up to date"
+fi
+
+# Install (-S) handling
+if [[ $option = install || $option = update ]]; then
+  installhandling "${packageargs[@]}"
+  exit
 fi
 
 # Download (-G) handling
