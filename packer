@@ -105,7 +105,7 @@ isignored() {
 
 # Tests whether $1 exists on the aur
 existsinaur() {
-  rpcinfo "$1"
+  [[ -f "$tmpdir/$1.info" ]] || rpcinfo "$1"
   [[ "$(jshon -Qe resultcount -u < "$tmpdir/$1.info")" != "0" ]]
 }
 
@@ -569,6 +569,7 @@ if [[ $option = update ]]; then
   IFS=$'\n' read -rd '' -a packages < <(pacman -Qm)
   newpackages=()
   checkignores=()
+  notinaurpackages=()
   total="${#packages[@]}"
   grep -q '^ *ILoveCandy' "$pacmanconf" && bartype='candy' || bartype='normal'
 
@@ -587,7 +588,8 @@ if [[ $option = update ]]; then
     for ((i=0; i<$total; i++)); do 
       pkg="${packages[i]%% *}"
       ver="${packages[i]##* }"
-      if [[ ! -s "$tmpdir/$pkg.PKGBUILD" ]]; then
+      if ! existsinaur "$pkg"; then
+        notinaurpackages+=("$pkg")
         continue
       fi
       if isignored "$pkg"; then
@@ -612,7 +614,9 @@ if [[ $option = update ]]; then
     for ((i=0; i<$total; i++)); do
       pkg="${packages[i]%% *}"
       ver="${packages[i]##* }"
-      if isignored "$pkg"; then
+      if ! existsinaur "$pkg"; then
+        notinaurpackages+=("$pkg")
+      elif isignored "$pkg"; then
         checkignores+=("${packages[i]}")
       elif aurversionisnewer "$pkg" "$ver"; then
         newpackages+=("$pkg")
@@ -622,6 +626,11 @@ if [[ $option = update ]]; then
   echo
 
   echo -e "${COLOR5}:: ${COLOR1}Starting full aur upgrade...${ENDCOLOR}"
+
+  # Output packages that are not in AUR
+  for package in "${notinaurpackages[@]}"; do
+    echo -e "${COLOR6}information:${ENDCOLOR} $package: package does not exist in AUR"
+  done
 
   # Check and output ignored package update info
   for package in "${checkignores[@]}"; do
