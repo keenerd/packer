@@ -60,6 +60,7 @@ usage() {
   echo '    -Ss|-Ssq     - searches for package'
   echo '    -Si          - outputs info for package'
   echo '    -G           - download and extract aur tarball only'
+  echo '    -C           - clone/pull the package aur git repository'
   echo
   echo '    --quiet      - only output package name for searches'
   echo '    --ignore     - takes a comma-separated list of packages to ignore'
@@ -522,6 +523,7 @@ while [[ $1 ]]; do
     '-Si') option=info ;;
     -S*u*) option=update ; pacmanarg="$1" ;;
     '-G') option=download ;;
+    '-C') option=git ;;
     '-h'|'--help') usage ;;
     '--quiet') quiet='1' ;;
     '--ignore') ignorearg="$2" ; PACOPTS+=("--ignore" "$2") ; shift ;;
@@ -652,6 +654,34 @@ if [[ $option = download ]]; then
     curl -Lfs "$(pkglink $package)" > "$package.tar.gz"
     mkdir "$package"
     tar xf "$package.tar.gz" -C "$package" --strip-components=1
+  done
+fi
+
+
+# Git clone/pull handling
+
+if [[ $option = git ]]; then
+  for package in "${packageargs[@]}"; do
+    if existsinaur "$package"; then
+      pkglist+=("$package")
+    else
+      err "Package \`$package' does not exist on aur."
+    fi
+  done
+
+  for package in "${pkglist[@]}"; do
+    clone_link="${PKGURL}/${package}.git"
+
+    # if a clone already exists, try to pull
+    # otherwise clone.
+    if [[ -d "$package/.git" ]]; then
+      cd "$package"
+      git pull "${clone_link}"
+      cd ..
+    else
+      # shallow clone
+      git clone --depth 1 "${clone_link}" "${package}"
+    fi
   done
 fi
 
