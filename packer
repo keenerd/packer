@@ -67,6 +67,7 @@ usage() {
   echo '    --noedit     - do not prompt to edit files'
   echo '    --quickcheck - check for updates and exit'
   echo '    --auronly    - only do actions for aur'
+  echo '    --noaur      - do not perform any commands for aur'
   echo '    --devel      - update devel packages during -Su'
   echo '    --skipinteg  - when using makepkg, do not check md5s'
   echo '    --preview    - edit pkgbuild before sourcing'
@@ -358,7 +359,7 @@ installhandling() {
       pacmanpackages+=("$package")
     elif ! [[ $auronly ]] && existsinpacmangroup "$package"; then
       pacmanpackages+=("$package")
-    elif existsinaur "$package"; then
+    elif ! [[ $noaur ]] && existsinaur "$package"; then
       if finddeps "$package"; then
         # here is where dep dupes are created
         aurpackages+=("$package")
@@ -528,6 +529,7 @@ while [[ $1 ]]; do
     '--noconfirm') noconfirm='1' PACOPTS+=("--noconfirm");;
     '--noedit') noedit='1' ;;
     '--auronly') auronly='1' ;;
+    '--noaur') noaur='1' ;;
     '--quickcheck') quickcheck='1' ;;
     '--devel') devel='1' ;;
     '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
@@ -562,6 +564,10 @@ if [[ $option = update ]]; then
   # Pacman update
   if ! [[ $auronly ]]; then
     runasroot $PACMAN "${PACOPTS[@]}" "$pacmanarg"
+  fi
+
+  if [[ $noaur ]]; then
+    exit
   fi
 
   # Aur update
@@ -677,6 +683,10 @@ if [[ $option = search || $option = searchinstall ]]; then
     pactotal=0
   fi
 
+  if [[ $noaur ]]; then
+    exit
+  fi
+
   # Aur searching and tmpfile preparation
   for package in "${packageargs[@]}"; do
     curl -LfGs --data-urlencode "arg=$package" "$RPCURL=search" | \
@@ -763,7 +773,7 @@ if [[ $option = info ]]; then
       results="$(sed -r "s|^[^ ][^:]*:|$S${COLOR1}&$S${ENDCOLOR}|" <<< "$results")"
       echo -e "$results"
       exit
-    else # Check to see if it is in the aur
+    elif ! [[ $noaur ]] ; then # Check to see if it is in the aur
       pkginfo "$package" "$preview"
       [[ -s "$tmpdir/$package.PKGBUILD" ]] || err "${COLOR7}error:${ENDCOLOR} package '$package' was not found"
       . "$tmpdir/$package.PKGBUILD"
