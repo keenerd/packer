@@ -70,6 +70,7 @@ usage() {
   echo '    --devel      - update devel packages during -Su'
   echo '    --skipinteg  - when using makepkg, do not check md5s'
   echo '    --preview    - edit pkgbuild before sourcing'
+  echo '    --root       - takes a path to an alternative installation root'
   echo '    -h           - outputs this message'
   exit
 }
@@ -532,6 +533,7 @@ while [[ $1 ]]; do
     '--devel') devel='1' ;;
     '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
     '--preview') preview='1' ;;
+    '--root') installroot="$2" ; PACOPTS+=("--root" "$2") ; shift ;;
     '--') shift ; packageargs+=("$@") ; break ;;
     -*) echo "packer: Option \`$1' is not valid." ; exit 5 ;;
     *) packageargs+=("$1") ;;
