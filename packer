@@ -67,6 +67,7 @@ usage() {
   echo '    --noedit     - do not prompt to edit files'
   echo '    --quickcheck - check for updates and exit'
   echo '    --auronly    - only do actions for aur'
+  echo '    --needed     - do not reinstall targets that are already up-to-date'
   echo '    --devel      - update devel packages during -Su'
   echo '    --skipinteg  - when using makepkg, do not check md5s'
   echo '    --preview    - edit pkgbuild before sourcing'
@@ -411,10 +412,19 @@ installhandling() {
     if existsinlocal "$pkg"; then
       localversion="$(pacman -Qs "$pkg" | grep -F "local/$pkg" | cut -d ' ' -f 2)"
       if ! aurversionisnewer "$pkg" "$localversion"; then
-        echo -e "${COLOR6}warning:$ENDCOLOR $pkg-$localversion is up to date -- reinstalling"
+        if [[ $needed ]]; then
+          aurtargets=${aurtargets[@]/$pkg}
+          echo -e "${COLOR6}warning:$ENDCOLOR $pkg-$localversion is up to date -- skipping"
+        else
+          echo -e "${COLOR6}warning:$ENDCOLOR $pkg-$localversion is up to date -- reinstalling"
+        fi
       fi
     fi
   done
+
+  if [[ -z $aurtargets ]]; then
+    exit
+  fi
 
   # Echo warning if packages are out of date
   for pkg in "${aurtargets[@]}" "${aurdepends[@]}"; do
@@ -528,6 +538,7 @@ while [[ $1 ]]; do
     '--noconfirm') noconfirm='1' PACOPTS+=("--noconfirm");;
     '--noedit') noedit='1' ;;
     '--auronly') auronly='1' ;;
+    '--needed') needed=1 ; PACOPTS+=("--needed") ;;
     '--quickcheck') quickcheck='1' ;;
     '--devel') devel='1' ;;
     '--skipinteg') MAKEPKGOPTS="--skipinteg" ;;
