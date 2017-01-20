@@ -286,6 +286,11 @@ aurinstall() {
   dir="${TMPDIR:-/tmp}/packerbuild-$UID/$1"
   sourcemakepkgconf
 
+  if [[ $UID -eq 0 ]]; then
+    echo "makepkg cannot be run as root. Abort."
+    return
+  fi
+
   # Prepare the installation directory
   # If there is an old directory and aurversion is not newer, use old directory
   if . "$dir/$1/PKGBUILD" &>/dev/null && ! aurversionisnewer "$1" "$pkgver-$pkgrel"; then
@@ -328,11 +333,7 @@ aurinstall() {
 
   # Installation (makepkg and pacman)
   rm -f *$PKGEXT
-  if [[ $UID -eq 0 ]]; then
-    makepkg $MAKEPKGOPTS --asroot -f
-  else
-    makepkg $MAKEPKGOPTS -f
-  fi
+  makepkg $MAKEPKGOPTS -f
 
   [[ $? -ne 0 ]] && echo "The build failed." && return 1
   pkgtarfiles=""
