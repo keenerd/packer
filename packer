@@ -66,6 +66,7 @@ usage() {
   echo '    --noconfirm  - do not prompt for any confirmation'
   echo '    --noedit     - do not prompt to edit files'
   echo '    --quickcheck - check for updates and exit'
+  echo '    --asdeps     - install package as dependency'
   echo '    --auronly    - only do actions for aur'
   echo '    --devel      - update devel packages during -Su'
   echo '    --skipinteg  - when using makepkg, do not check md5s'
@@ -401,7 +402,11 @@ installhandling() {
  
   # First install the explicit pacman packages, let pacman prompt
   if [[ $pacmanpackages ]]; then
-    runasroot $PACMAN "${PACOPTS[@]}" -S -- "${pacmanpackages[@]}"
+    if [[ $asdeps ]]; then
+      runasroot $PACMAN "${PACOPTS[@]}" -S --asdeps -- "${pacmanpackages[@]}"
+    else
+      runasroot $PACMAN "${PACOPTS[@]}" -S -- "${pacmanpackages[@]}"
+    fi
   fi
   if [[ -z $aurtargets ]]; then
     exit
@@ -461,7 +466,11 @@ installhandling() {
   for package in "${aurtargets[@]}"; do
     scrapeaurdeps "$package"
     if pacman -T "${dependencies[@]}" &>/dev/null; then
-      aurinstall "$package" "explicit"
+      if [[ $asdeps ]]; then
+        aurinstall "$package" "dependency"
+      else
+        aurinstall "$package" "explicit"
+      fi
     else
       echo "Dependencies for \`$package' are not met, not building..."
     fi
@@ -527,6 +536,7 @@ while [[ $1 ]]; do
     '--ignore') ignorearg="$2" ; PACOPTS+=("--ignore" "$2") ; shift ;;
     '--noconfirm') noconfirm='1' PACOPTS+=("--noconfirm");;
     '--noedit') noedit='1' ;;
+    '--asdeps') asdeps='1' ;;
     '--auronly') auronly='1' ;;
     '--quickcheck') quickcheck='1' ;;
     '--devel') devel='1' ;;
