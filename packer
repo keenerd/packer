@@ -135,8 +135,11 @@ existsinlocal() {
 scrapeaurdeps() {
   pkginfo "$1" "$preview"
   . "$tmpdir/$1.PKGBUILD"
+  local deps_carch=( $(eval "echo \$$(echo {depends_${CARCH}[@]})") )
+  local mkdeps_carch=( $(eval "echo \$$(echo {makedepends_${CARCH}[@]})") )
   IFS=$'\n'
-  dependencies=( $(echo -e "${depends[*]}\n${makedepends[*]}" | sed -e 's/=.*//' -e 's/>.*//' -e 's/<.*//'| sort -u) )
+  dependencies=( $(echo -e "${depends[*]}\n${makedepends[*]}\n${deps_carch[*]}\n${mkdeps_carch[*]}" |
+                            sed -e 's/=.*//' -e 's/>.*//' -e 's/<.*//'| sort -u) )
   unset IFS
 }
 
@@ -770,6 +773,8 @@ if [[ $option = info ]]; then
 
       # Echo out the -Si formatted package information
       # Retrieve each element in order and echo them immediately
+      depends_carch=( $(eval "echo \$$(echo {depends_${CARCH}[@]})") )
+      makedepends_carch=( $(eval "echo \$$(echo {makedepends_${CARCH}[@]})") )
       echo -e "${COLOR1}Repository     : ${COLOR3}aur"
       echo -e "${COLOR1}Name           : $pkgname"
       echo -e "${COLOR1}Version        : ${COLOR2}$pkgver-$pkgrel"
@@ -777,12 +782,13 @@ if [[ $option = info ]]; then
       echo -e "${COLOR1}Licenses       : ${ENDCOLOR}${license[@]}"
       echo -e "${COLOR1}Groups         : ${ENDCOLOR}${groups[@]:-None}"
       echo -e "${COLOR1}Provides       : ${ENDCOLOR}${provides[@]:-None}"
-      echo -e "${COLOR1}Depends On     : ${ENDCOLOR}${depends[@]}"
-      echo -e "${COLOR1}Make Depends   : ${ENDCOLOR}${makedepends[@]}"
+      echo -e "${COLOR1}Depends On     : ${ENDCOLOR}${depends[@]} ${depends_carch[@]}"
+      echo -e "${COLOR1}Make Depends   : ${ENDCOLOR}${makedepends[@]} ${makedepends_carch[@]}"
       echo -e -n "${COLOR1}Optional Deps  : ${ENDCOLOR}"
 
       len="${#optdepends[@]}"
-      if [[ $len -eq 0 ]]; then
+      len_carch="$(eval "echo \$$(echo {#optdepends_${CARCH}[@]})")"
+      if [[ $len -eq 0 ]] && [[ $len_carch -eq 0 ]]; then
         echo "None"
       else
         for ((i=0 ; i<$len ; i++)); do
@@ -790,6 +796,13 @@ if [[ $option = info ]]; then
             echo "${optdepends[$i]}"
           else
             echo -e "                 ${optdepends[$i]}" 
+          fi
+        done
+        for ((i=0 ; i<$len_carch ; i++)); do
+          if [[ $i = 0 ]]; then
+            echo "$(eval "echo \$$(echo {optdepends_${CARCH}[$i]})")"
+          else
+            echo -e "                 $(eval "echo \$$(echo {optdepends_${CARCH}[$i]})")"
           fi
         done
       fi
