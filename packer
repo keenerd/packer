@@ -353,6 +353,8 @@ installhandling() {
   sourcemakepkgconf
   # Figure out all of the packages that need to be installed
   for package in "${packageargs[@]}"; do
+    # Strip leading aur/, if it exists
+    package="${package##aur/}"
     # Determine whether package is in pacman repos
     if ! [[ $auronly ]] && existsinpacman "$package"; then
       pacmanpackages+=("$package")
