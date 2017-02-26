@@ -768,12 +768,17 @@ if [[ $option = info ]]; then
       [[ -s "$tmpdir/$package.PKGBUILD" ]] || err "${COLOR7}error:${ENDCOLOR} package '$package' was not found"
       . "$tmpdir/$package.PKGBUILD"
 
+      # Grap package ID
+      rpcinfo "$package"
+      pkgid=$(jshon -Q -e results -e ID -u < "$tmpdir/$package.info")
+
       # Echo out the -Si formatted package information
       # Retrieve each element in order and echo them immediately
       echo -e "${COLOR1}Repository     : ${COLOR3}aur"
       echo -e "${COLOR1}Name           : $pkgname"
       echo -e "${COLOR1}Version        : ${COLOR2}$pkgver-$pkgrel"
       echo -e "${COLOR1}URL            : ${COLOR4}$url"
+      echo -e "${COLOR1}AUR            : ${COLOR4}${PKGURL}.php?ID=$pkgid"
       echo -e "${COLOR1}Licenses       : ${ENDCOLOR}${license[@]}"
       echo -e "${COLOR1}Groups         : ${ENDCOLOR}${groups[@]:-None}"
       echo -e "${COLOR1}Provides       : ${ENDCOLOR}${provides[@]:-None}"
