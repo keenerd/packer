@@ -136,7 +136,7 @@ scrapeaurdeps() {
   pkginfo "$1" "$preview"
   . "$tmpdir/$1.PKGBUILD"
   IFS=$'\n'
-  dependencies=( $(echo -e "${depends[*]}\n${makedepends[*]}" | sed -e 's/=.*//' -e 's/>.*//' -e 's/<.*//'| sort -u) )
+  dependencies=( $(echo -e "${depends[*]}\n${makedepends[*]}\n${checkdepends[*]}" | sed -e 's/=.*//' -e 's/>.*//' -e 's/<.*//'| sort -u) )
   unset IFS
 }
 
@@ -779,6 +779,7 @@ if [[ $option = info ]]; then
       echo -e "${COLOR1}Provides       : ${ENDCOLOR}${provides[@]:-None}"
       echo -e "${COLOR1}Depends On     : ${ENDCOLOR}${depends[@]}"
       echo -e "${COLOR1}Make Depends   : ${ENDCOLOR}${makedepends[@]}"
+      echo -e "${COLOR1}Check Depends  : ${ENDCOLOR}${checkdepends[@]}"
       echo -e -n "${COLOR1}Optional Deps  : ${ENDCOLOR}"
 
       len="${#optdepends[@]}"
